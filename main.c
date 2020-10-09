@@ -6,6 +6,9 @@
 
 // frequencies for C,   D,   E,   F,   G,   A,   B respectively
 int frequency[] = {262, 294, 330, 349, 392, 440, 494};
+//								E5   F5   B4   F5   G5   B5   A5   G5   F5   E5   F5   B4
+int rickrollStart[] = {659, 698, 494, 698, 784, 988, 880, 784, 698, 659, 698, 494};
+int rickrollChorus[] = {};
 
 // LEDs
 #define PIN_RLED	A1

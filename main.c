@@ -11,25 +11,28 @@ int rickrollStart[] = {659, 698, 494, 698, 784, 988, 880, 784, 698, 659, 698, 49
 int rickrollChorus[] = {};
 
 // LEDs
-#define PIN_RLED	A1
-#define PIN_GLED1	A5
-#define PIN_GLED2	A4
-#define PIN_GLED3	A3
-#define PIN_GLED4	A2
-#define PIN_GLED5	A0
-#define PIN_GLED6	2
-#define PIN_GLED7	4
-#define PIN_GLED8	11
+#define PIN_RLED	5  //portC pin16
+	
+#define PIN_GLED1	3  //portC pin3
+#define PIN_GLED2	4  //portC pin4
+#define PIN_GLED3	5  //portC pin5
+#define PIN_GLED4	6  //portC pin6
+#define PIN_GLED5	10 //portC pin10
+#define PIN_GLED6	11 //portC pin11
+#define PIN_GLED7	12 //portC pin12
+#define PIN_GLED8	13 //portC pin13
 
-// Motor
-#define PIN_MOTORFRP	10	// PWM
-#define PIN_MOTORFRN	12
-#define PIN_MOTORFLP	5	// PWM
-#define PIN_MOTORFLN	13
-#define PIN_MOTORBRP	9	// PWM
-#define PIN_MOTORBRN	8
-#define PIN_MOTORBLP	6	// PWM
-#define PIN_MOTORBLN	7
+// Motors
+//	F front B back C clockwise CC counter clockwise
+#define PIN_MOTOR_LEFT_FC	 3 //PTB3 
+#define PIN_MOTOR_LEFT_FCC 2 //PTB2
+#define PIN_MOTOR_LEFT_BC	 1 //PTB1
+#define PIN_MOTOR_LEFT_BCC 0 //PTB0
+	
+#define PIN_MOTOR_RIGHT_FC	5//PTD5	 
+#define PIN_MOTOR_RIGHT_FCC	0//PTD0
+#define PIN_MOTOR_RIGHT_BC	2//PTD2
+#define PIN_MOTOR_RIGHT_BCC	3//PTD3
 
 // Buzzer
 #define PIN_AUDIO   3
@@ -41,12 +44,70 @@ int rickrollChorus[] = {};
 #define MASK(x) (1 << (x))
 #define PIN_NUM 3 
 
+#define Q_SIZE (32)
+
+// 
+// CODE CHUNK FOR QUEUE HERE
+// struct for queue
+typedef struct {
+	unsigned char Data[Q_SIZE];
+	unsigned int Head; //points to oldest data element
+	unsigned int Tail; //points to next free space
+	unsigned int Size; // quantity of elements in queue
+} Q_T;
+
+//declaration of tx queue and rx queue
+Q_T tx_q, rx_q;
+
 enum color_t{RED, GREEN, BLUE};
 
-volatile int counter = 0;
+// ISR for UART
+void UART2_IRQHandler() {
+	
+}
 
+void Q_Init(Q_T *q) {
+	unsigned int i;
+	for (i=0; i<Q_SIZE; i++)
+		q->Data[i] = 0; // to simplify our lives when debugging
+	q->Head = 0;
+	q->Tail = 0;
+	q->Size = 0;
+}
 
+int Q_Empty (Q_T * q) {
+	return q->Size == 0;
+}
 
+int Q_Full(Q_T * q) {
+	return q->Size == Q_SIZE;
+}
+
+int Q_Enqueue(Q_T * q, unsigned char d) {
+	if (!Q_Full(q)) {
+	q->Data[q->Tail++] = d;
+	q->Tail %= Q_SIZE;
+	q->Size++;
+	return 1; // success
+	} else
+	return 0; // failure
+}
+
+unsigned char Q_Dequeue(Q_T * q) {
+	// Must check to see if queue is empty before dequeueing
+	unsigned char t=0;
+	if (!Q_Empty(q)) {
+	t = q->Data[q->Head];
+	q->Data[q->Head++] = 0; // to simplify debugging
+	q->Head %= Q_SIZE;
+	q->Size--;
+	}
+	return t;
+}
+//
+// CODE CHUNK FOR QUEUE ENDS HERE
+//
+	
 void initLed(void)
 {
 	// Enable Clock to PORTB and PORTD

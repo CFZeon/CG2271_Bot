@@ -21,6 +21,10 @@ int rickrollChorus[] = {};
 #define PIN_GLED6	11 //portC pin11
 #define PIN_GLED7	12 //portC pin12
 #define PIN_GLED8	13 //portC pin13
+#define GREEN_LED_MASK 0x00003C78
+	
+static int gLedPos[] = {3,4,5,6,10,11,12,13};
+volatile uint8_t ledCounter = 0;
 
 // Motors
 //	F front B back C clockwise CC counter clockwise
@@ -110,42 +114,51 @@ unsigned char Q_Dequeue(Q_T * q) {
 	
 void initLed(void)
 {
-	// Enable Clock to PORTB and PORTD
-	SIM->SCGC5 |= ((SIM_SCGC5_PORTB_MASK) | (SIM_SCGC5_PORTD_MASK));
+	// Enable Clock to PORTC
+	SIM->SCGC5 |= (SIM_SCGC5_PORTC_MASK);
 		
-	// Configure MUX settings to make all 3 pins GPIO
-	// PCR is pin control register
-	PORTB->PCR[RED_LED] &= ~PORT_PCR_MUX_MASK;
-	PORTB->PCR[RED_LED] |= PORT_PCR_MUX(1);
-	PORTB->PCR[GREEN_LED] &= ~PORT_PCR_MUX_MASK;
-	PORTB->PCR[GREEN_LED] |= PORT_PCR_MUX(1);
-	PORTD->PCR[BLUE_LED] &= ~PORT_PCR_MUX_MASK;
-	PORTD->PCR[BLUE_LED] |= PORT_PCR_MUX(1);
+	//Configure pins to GPIO
+	PORTC->PCR[PIN_RLED] &= ~PORT_PCR_MUX_MASK;
+	PORTC->PCR[PIN_RLED] |= PORT_PCR_MUX(1);
+	//Init green led
+	for(int i = 0; i < 8; i++){
+		PORTC->PCR[gLedPos[i]] &= ~PORT_PCR_MUX_MASK;
+		PORTC->PCR[gLedPos[i]] |= PORT_PCR_MUX(1);
+	}
+
 		
-	// Set Data Direction Registers for PortB and PortD
-	// Configures the individual pins for input or output
-	PTB->PDDR |= (MASK(RED_LED) | MASK(GREEN_LED));
-	PTD->PDDR |= MASK(BLUE_LED);
+	// Set Data Direction Registers for PortC
+	PTC->PDDR |= GREEN_LED_MASK;
+	PTC->PDDR |= MASK(PIN_RLED);
+}
+//Flash red LED on and off 500ms or 250ms as determined
+void tLEDRED(int delayTime){
+	while(1){
+		PTC->PSOR |= MASK(PIN_RLED);
+		osDelay(delayTime);
+		PTC->PCOR |= MASK(delayTime);
+		osDelay(delayTime);
+	}
 }
 
-// Setting bits to 1 turns the LED off, active low
-void turnAllLedOff() {
-	GPIOB->PDOR |= MASK(RED_LED) | MASK(GREEN_LED);
-	GPIOD->PDOR |= MASK(BLUE_LED);
+//Flash green LED on and off 500ms or 250ms as determined
+void flashGreen(int delayTime){
+	while(1){
+		PTC->PSOR |= GREEN_LED_MASK;
+		osDelay(delayTime);
+		PTC->PCOR |= GREEN_LED_MASK;
+		osDelay(delayTime);
+	}
 }
 
-// Shows colour passed in on LED
-void showSingleLed(enum color_t col) {
-	switch (col) {
-	case RED:
-		GPIOB->PDOR &= ~MASK(RED_LED);
-		break;
-	case GREEN:
-		GPIOB->PDOR &= ~MASK(GREEN_LED);
-		break;
-	case BLUE:
-		GPIOD->PDOR &= ~MASK(BLUE_LED);
-		break;
+//Flash green 1 by 1
+void alternatingGreen(int delayTime){
+	while(1){
+		PTC->PCOR |= GREEN_LED_MASK;
+		PTC->PSOR |= gLedPos[ledCounter++];
+		osDelay(delayTime);
+		if(ledCounter >=7){
+			ledCounter =0;
 	}
 }
 
@@ -159,13 +172,13 @@ void showSingleLed(enum color_t col) {
 const osThreadAttr_t thread_attr = {
 	.priority = osPriorityNormal1
 };
-void app_main (void *argument) {
+/*void app_main (void *argument) {
  
   // ...
   for (;;) {
 		showSingleLed(RED);
 		osDelay(1000);
-		turnAllLedOff();
+		//turnAllLedOff();
 		osDelay(1000);
 	}
 }
@@ -183,3 +196,4 @@ int main (void) {
   osKernelStart();                      // Start thread execution
   for (;;) {}
 }
+*/

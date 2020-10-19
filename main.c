@@ -50,6 +50,12 @@ volatile uint8_t ledCounter = 0;
 
 #define Q_SIZE (32)
 
+// UART
+#define BAUD_RATE 9600
+#define UART_TX_PORTE22 22
+#define UART_RX_PORTE23 23
+#define UART2_INT_PRIO 128
+
 // 
 // CODE CHUNK FOR QUEUE HERE
 // struct for queue
@@ -66,19 +72,6 @@ Q_T tx_q, rx_q;
 enum color_t{RED, GREEN, BLUE};
 
 // ISR for UART
-void UART2_IRQHandler() {
-	
-}
-
-void Q_Init(Q_T *q) {
-	unsigned int i;
-	for (i=0; i<Q_SIZE; i++)
-		q->Data[i] = 0; // to simplify our lives when debugging
-	q->Head = 0;
-	q->Tail = 0;
-	q->Size = 0;
-}
-
 int Q_Empty (Q_T * q) {
 	return q->Size == 0;
 }
@@ -97,6 +90,15 @@ int Q_Enqueue(Q_T * q, unsigned char d) {
 	return 0; // failure
 }
 
+void Q_Init(Q_T *q) {
+	unsigned int i;
+	for (i=0; i<Q_SIZE; i++)
+		q->Data[i] = 0; // to simplify our lives when debugging
+	q->Head = 0;
+	q->Tail = 0;
+	q->Size = 0;
+}
+
 unsigned char Q_Dequeue(Q_T * q) {
 	// Must check to see if queue is empty before dequeueing
 	unsigned char t=0;
@@ -107,6 +109,74 @@ unsigned char Q_Dequeue(Q_T * q) {
 	q->Size--;
 	}
 	return t;
+}
+
+void initUART2(uint32_t baudrate)
+{
+	uint32_t divisor, bus_clock;
+	
+	SIM->SCGC4 |= SIM_SCGC4_UART2_MASK;
+	SIM->SCGC5 |= SIM_SCGC5_PORTE_MASK;
+	
+	PORTE->PCR[UART_TX_PORTE22] &= ~PORT_PCR_MUX_MASK;
+	PORTE->PCR[UART_TX_PORTE22] |= PORT_PCR_MUX(4);
+	
+	PORTE->PCR[UART_RX_PORTE23] &= ~PORT_PCR_MUX_MASK;
+	PORTE->PCR[UART_RX_PORTE23] |= PORT_PCR_MUX(4);
+	
+	UART2->C2 &= ~((UART_C2_TE_MASK) | (UART_C2_RE_MASK));
+	
+	bus_clock = (DEFAULT_SYSTEM_CLOCK)/2;
+	divisor = bus_clock / (BAUD_RATE * 16);
+	UART2->BDH = UART_BDH_SBR(divisor >> 8);
+	UART2->BDL = UART_BDL_SBR(divisor);
+	
+	UART2->C1 = 0;
+	UART2->S2 = 0;
+	UART2->C3 = 0;
+	
+	UART2->C2 |= ((UART_C2_TE_MASK) | (UART_C2_RE_MASK));
+	
+	NVIC_SetPriority(UART2_IRQn, 128);
+	NVIC_ClearPendingIRQ(UART2_IRQn);
+	NVIC_EnableIRQ(UART2_IRQn);
+	UART2->C2 |= UART_C2_TIE_MASK |
+	UART_C2_RIE_MASK;
+	UART2->C2 |= UART_C2_RIE_MASK;
+	Q_Init(&tx_q);
+	Q_Init(&rx_q);
+}
+
+void UART2_IRQHandler() {
+	NVIC_ClearPendingIRQ(UART2_IRQn);
+	// for transmit
+	if (UART2->S1 & UART_S1_TDRE_MASK) {
+		// can send another character
+		if (!Q_Empty(&tx_q)) {
+			UART2->D = Q_Dequeue(&tx_q);
+		} else {
+			// queue is empty so disable tx
+			UART2->C2 &= ~UART_C2_TIE_MASK;
+		}
+	}
+	// for receiver
+	if (UART2->S1 & UART_S1_RDRF_MASK) {
+		// received a character
+		if (!Q_Full(&rx_q)) {
+			Q_Enqueue(&rx_q, UART2->D);
+			} else {
+			// error - queue full. (while 1 is a bad fix)
+			while (1)
+					;
+		}
+	}
+	if (UART2->S1 & (UART_S1_OR_MASK |
+									 UART_S1_NF_MASK |
+									 UART_S1_FE_MASK |
+									 UART_S1_PF_MASK)) {
+		// TO IMPLEMENT error handling
+		// clear the flag
+	}
 }
 //
 // CODE CHUNK FOR QUEUE ENDS HERE

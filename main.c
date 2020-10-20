@@ -6,9 +6,10 @@
 
 // frequencies for C,   D,   E,   F,   G,   A,   B respectively
 int frequency[] = {262, 294, 330, 349, 392, 440, 494};
-//								E5   F5   B4   F5   G5   B5   A5   G5   F5   E5   F5   B4
+//								     E5   F5   B4   F5   G5   B5   A5   G5   F5   E5   F5   B4
 int rickrollStart[] = {659, 698, 494, 698, 784, 988, 880, 784, 698, 659, 698, 494};
-int rickrollChorus[] = {};
+//											nev  er   gon  na   give you  up   nev  er   gon  na   let  you  do   wn
+int rickrollChorus[] = {233, 261, 277, 293, 349, 349, 311, 207, 233, 261, 207, 311, 311, 277, 233};
 
 // LEDs
 #define PIN_RLED	5  //portC pin16
@@ -48,7 +49,6 @@ volatile uint8_t ledCounter = 0;
 #define MASK(x) (1 << (x))
 #define PIN_NUM 3 
 
-#define Q_SIZE (32)
 
 // UART
 #define BAUD_RATE 9600
@@ -56,9 +56,55 @@ volatile uint8_t ledCounter = 0;
 #define UART_RX_PORTE23 23
 #define UART2_INT_PRIO 128
 
-// 
-// CODE CHUNK FOR QUEUE HERE
-// struct for queue
+#define Q_SIZE (32)
+
+//////////////////////////
+// CODE CHUNK FOR AUDIO //
+//////////////////////////
+void initPWMBuzzer() {
+	// supplies power to the port
+	SIM_SCGC5 |= SIM_SCGC5_PORTB_MASK;
+	
+	// 3 here sets the pin to timer mode page 163
+	PORTB->PCR[PIN_AUDIO] &= ~PORT_PCR_MUX_MASK;
+	PORTB->PCR[PIN_AUDIO] |= PORT_PCR_MUX(3);
+	// this bit controls the clock
+	// bit 25 controls the clock gate to the TPM1 module
+	SIM->SCGC6 |= SIM_SCGC6_TPM1_MASK;
+	
+	// this selects the clock source for the TPM counter clock
+	// TPMSRC is bits 24/25
+	SIM->SOPT2 &= ~SIM_SOPT2_TPMSRC_MASK;
+	SIM->SOPT2 |= SIM_SOPT2_TPMSRC(1);
+	
+	/* Edge-Aligned PWM */
+	// Update SnC register : CMOD = 01, PS = 111 (128)
+	// CMOD 01 causes LPTPM counter to increment on every LPTPM counter clock
+	// CPWMS is set to 0 so counter operates in up counting mode
+	TPM1->SC &= ~((TPM_SC_CMOD_MASK) | (TPM_SC_PS_MASK));
+	TPM1->SC |= (TPM_SC_CMOD(1)) | (TPM_SC_PS(7));
+	TPM1->SC &= ~(TPM_SC_CPWMS_MASK);
+	
+	// Enable PWM on TPM1 Channel 0 -> PTB0
+	TPM1_C0SC &= ~((TPM_CnSC_ELSB_MASK) | (TPM_CnSC_ELSA_MASK) | (TPM_CnSC_MSB_MASK));
+	TPM1_C0SC |= (TPM_CnSC_ELSB(1) | TPM_CnSC_MSB(1));
+	
+	// Enable PWM on TPM1 Channel 1 -> PTB1
+	// edge aligned pwn with high true pulses
+	TPM1_C1SC &= ~((TPM_CnSC_ELSB_MASK) | (TPM_CnSC_ELSA_MASK) | (TPM_CnSC_MSB_MASK));
+	TPM1_C1SC |= (TPM_CnSC_ELSB(1) | TPM_CnSC_MSB(1));
+}
+
+void tAudio() {
+	
+}
+/////////////////////////////////
+// END OF CODE CHUNK FOR AUDIO //
+/////////////////////////////////
+
+// ////////////////////////////
+// CODE CHUNK FOR QUEUE HERE //
+// struct for queue ///////////
 typedef struct {
 	unsigned char Data[Q_SIZE];
 	unsigned int Head; //points to oldest data element
@@ -178,9 +224,9 @@ void UART2_IRQHandler() {
 		// clear the flag
 	}
 }
-//
-// CODE CHUNK FOR QUEUE ENDS HERE
-//
+////////////////////////////////////
+// CODE CHUNK FOR QUEUE ENDS HERE //
+////////////////////////////////////
 	
 void initLed(void)
 {

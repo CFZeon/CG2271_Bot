@@ -26,6 +26,7 @@ int rickrollChorus[] = {233, 261, 277, 293, 349, 349, 311, 207, 233, 261, 207, 3
 	
 static int gLedPos[] = {3,4,5,6,10,11,12,13};
 volatile uint8_t ledCounter = 0;
+volatile char currentCommand = 0;
 
 // Motors
 //	F front B back C clockwise CC counter clockwise
@@ -93,10 +94,6 @@ void initPWMBuzzer() {
 	// edge aligned pwn with high true pulses
 	TPM1_C1SC &= ~((TPM_CnSC_ELSB_MASK) | (TPM_CnSC_ELSA_MASK) | (TPM_CnSC_MSB_MASK));
 	TPM1_C1SC |= (TPM_CnSC_ELSB(1) | TPM_CnSC_MSB(1));
-}
-
-void tAudio() {
-	
 }
 /////////////////////////////////
 // END OF CODE CHUNK FOR AUDIO //
@@ -275,6 +272,57 @@ void alternatingGreen(int delayTime){
 		osDelay(delayTime);
 		if(ledCounter >=7){
 			ledCounter =0;
+		}
+	}
+}
+	
+
+void tBrain() {
+	for (;;)
+	{
+		char c = Q_Dequeue(&rx_q);
+		if (c != 0 || c != currentCommand){
+			currentCommand = c;
+		}
+	}
+}
+ 
+void tLED() {
+	for (;;)
+	{
+		//if (stop condition) {
+		// do action
+		//}
+		//else if (move condition) {
+		// do action
+		//}
+	}
+}
+
+void tAudio(){
+	for (;;)
+	{
+		//if (bluetooth connected condition) {
+		// do action
+		//}
+		//else if (doing challenge condition) {
+		// do action
+		//}
+		//else if (finished condition) {
+		// do action
+		//}
+	}
+}
+
+void tMotorControl() {
+	for (;;)
+	{
+		//if (stop condition) {
+		// do action
+		//}
+		//else if (move forward condition) {
+		// do action
+		//}
 	}
 }
 

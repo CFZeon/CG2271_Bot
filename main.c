@@ -40,6 +40,8 @@ volatile char currentCommand = 0;
 #define PIN_MOTOR_RIGHT_BC	2//PTD2
 #define PIN_MOTOR_RIGHT_BCC	3//PTD3
 
+#define MOD_VALUE 10000
+
 // Buzzer
 #define PIN_AUDIO   3
 
@@ -282,8 +284,8 @@ void initMotors(){
 	SIM->SOPT2 &= ~SIM_SOPT2_TPMSRC_MASK;
 	SIM->SOPT2 |= SIM_SOPT2_TPMSRC(1);
 	//cnv 1000 corresponds to 10 percent
-	TPM0->MOD = 10000;
-	TPM1->MOD = 10000;
+	TPM0->MOD = MOD_VALUE;
+	TPM1->MOD = MOD_VALUE;
 	//Prescalar : divide by 128
 	TPM0->SC &= ~((TPM_SC_CMOD_MASK) | (TPM_SC_PS_MASK));
 	TPM0->SC |= (TPM_SC_CMOD(1) | TPM_SC_PS(7));
@@ -328,6 +330,39 @@ void initMotors(){
 	TPM1_C0V = 0;
 	TPM1_C1V = 0;
 }
+
+void moveLeftFrontClockwise(int dutyCycle){
+	TPM0_C0V = (dutyCycle / 100) * (MOD_VALUE+1);
+}
+
+void moveLeftFrontCounterClockwise(int dutyCycle){
+	TPM0_C1V = (dutyCycle / 100) * (MOD_VALUE+1);
+}
+
+void moveLeftBackClockwise(int dutyCycle){
+	TPM0_C2V = (dutyCycle / 100) * (MOD_VALUE+1);
+}
+
+void moveLeftBackCounterClockwise(int dutyCycle){
+	TPM0_C3V = (dutyCycle / 100) * (MOD_VALUE+1);
+}
+
+void moveRightFrontClockwise(int dutyCycle){
+	TPM0_C4V = (dutyCycle / 100) * (MOD_VALUE+1);
+}
+
+void moveRightFrontCounterClockwise(int dutyCycle){
+	TPM0_C5V = (dutyCycle / 100) * (MOD_VALUE+1);
+}
+
+void moveRightBackClockwise(int dutyCycle){
+	TPM1_C0V = (dutyCycle / 100) * (MOD_VALUE+1);
+}
+
+void moveRightBackCounterClockwise(int dutyCycle){
+	TPM1_C1V = (dutyCycle / 100) * (MOD_VALUE+1);
+}
+
 //Flash red LED on and off 500ms or 250ms as determined
 void tLEDRED(int delayTime){
 	while(1){

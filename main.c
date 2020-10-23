@@ -128,9 +128,7 @@ void initLed(void)
 
 		
 	// Set Data Direction Registers for PortC
-	for(int i = 0; i < 8; i++){
-		PTC->PDDR |= MASK(gLedPos[i]);
-	}
+	PTC->PDDR |= GREEN_LED_MASK;
 	PTC->PDDR |= MASK(PIN_RLED);
 }
 //Flash red LED on and off 500ms or 250ms as determined
@@ -174,7 +172,7 @@ void alternatingGreen(int delayTime){
 const osThreadAttr_t thread_attr = {
 	.priority = osPriorityNormal1
 };
-void app_main (void *argument) {
+/*void app_main (void *argument) {
  
   // ...
   for (;;) {
@@ -198,3 +196,4 @@ int main (void) {
   osKernelStart();                      // Start thread execution
   for (;;) {}
 }
+*/

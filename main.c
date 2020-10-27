@@ -54,10 +54,11 @@ volatile char currentCommand = 0;
 #define MOD_VALUE 10000
 
 // Buzzer
-#define PIN_AUDIO   3
-#define FREQ_2_MOD(x) (375000 / x)
-//#define SIM_SCGC6_TPM2_MASK                      0x4000000u
+#define PIN_AUDIO 20 // PTE20 (TPM1_CH0 ALT3)
+#define FREQ_MOD(x) (375000 / x)
 
+
+// ??
 #define RED_LED 18   // PortB Pin 18
 #define GREEN_LED 19 // PortB Pin 19
 #define BLUE_LED 1   // PortD Pin 1
@@ -77,18 +78,19 @@ volatile char currentCommand = 0;
 //////////////////////////
 // CODE CHUNK FOR AUDIO //
 //////////////////////////
+
 void initPWMBuzzer() {
-	// changed TPM1 to TPM2
+	// changed to TPM1_CH0 (PTE20)
 	
 	// supplies power to the port
-	SIM_SCGC5 |= SIM_SCGC5_PORTB_MASK;
+	SIM_SCGC5 |= SIM_SCGC5_PORTE_MASK;
 	
 	// 3 here sets the pin to timer mode page 163
-	PORTB->PCR[PIN_AUDIO] &= ~PORT_PCR_MUX_MASK;
-	PORTB->PCR[PIN_AUDIO] |= PORT_PCR_MUX(3);
+	PORTE->PCR[PIN_AUDIO] &= ~PORT_PCR_MUX_MASK;
+	PORTE->PCR[PIN_AUDIO] |= PORT_PCR_MUX(3);
+	
 	// this bit controls the clock
-	// bit 25 controls the clock gate to the TPM1 module
-	SIM->SCGC6 |= SIM_SCGC6_TPM2_MASK;
+	SIM->SCGC6 |= SIM_SCGC6_TPM1_MASK;
 	
 	// this selects the clock source for the TPM counter clock
 	// TPMSRC is bits 24/25
@@ -96,25 +98,17 @@ void initPWMBuzzer() {
 	SIM->SOPT2 |= SIM_SOPT2_TPMSRC(1);
 	
 	// set modulo value 48000000 / 128 = 375000 / 7500 = 50 Hz
-	//TPM1->MOD = 7500;
+	TPM1->MOD = 7500;
 	
-	/* Edge-Aligned PWM */
-	// Update SnC register : CMOD = 01, PS = 111 (128)
-	// CMOD 01 causes LPTPM counter to increment on every LPTPM counter clock
-	// CPWMS is set to 0 so counter operates in up counting mode
-	TPM2->SC &= ~((TPM_SC_CMOD_MASK) | (TPM_SC_PS_MASK));
-	TPM2->SC |= (TPM_SC_CMOD(1)) | (TPM_SC_PS(7));
-	TPM2->SC &= ~(TPM_SC_CPWMS_MASK);
+	// Edge-Aligned PWM
+	TPM1->SC &= ~((TPM_SC_CMOD_MASK) | (TPM_SC_PS_MASK));
+	TPM1->SC |= (TPM_SC_CMOD(1)) | (TPM_SC_PS(7));
+	TPM1->SC &= ~(TPM_SC_CPWMS_MASK);
 	
-	// Enable PWM on TPM1 Channel 0 -> PTB0
-	TPM2_C0SC &= ~((TPM_CnSC_ELSB_MASK) | (TPM_CnSC_ELSA_MASK) | (TPM_CnSC_MSB_MASK));
-	TPM2_C0SC |= (TPM_CnSC_ELSB(1) | TPM_CnSC_MSB(1));
-	
-	// Enable PWM on TPM1 Channel 1 -> PTB1
-	// edge aligned pwn with high true pulses
-	//TPM1_C1SC &= ~((TPM_CnSC_ELSB_MASK) | (TPM_CnSC_ELSA_MASK) | (TPM_CnSC_MSB_MASK));
-	//TPM1_C1SC |= (TPM_CnSC_ELSB(1) | TPM_CnSC_MSB(1));
+	TPM1_C0SC &= ~((TPM_CnSC_ELSB_MASK) | (TPM_CnSC_ELSA_MASK) | (TPM_CnSC_MSB_MASK) | (TPM_CnSC_MSA_MASK));
+	TPM1_C0SC |= (TPM_CnSC_ELSB(1) | TPM_CnSC_MSB(1));
 }
+
 /////////////////////////////////
 // END OF CODE CHUNK FOR AUDIO //
 /////////////////////////////////
@@ -122,6 +116,7 @@ void initPWMBuzzer() {
 // ////////////////////////////
 // CODE CHUNK FOR QUEUE HERE //
 // struct for queue ///////////
+
 typedef struct {
 	uint8_t Data[Q_SIZE];
 	unsigned int Head; //points to oldest data element
@@ -241,6 +236,7 @@ void UART2_IRQHandler() {
 		// clear the flag
 	}
 }
+
 ////////////////////////////////////
 // CODE CHUNK FOR QUEUE ENDS HERE //
 ////////////////////////////////////
@@ -461,10 +457,10 @@ void tAudio(void *argument){
 		if (currentCommand == 'c' || isStart == false) {
 			for (int i=0; i<12; i++){
 				// mod determines period
-				TPM1->MOD = FREQ_2_MOD(rickrollStart[i]);
+				TPM1->MOD = FREQ_MOD(rickrollStart[i]);
 				// C0V is the one that determines duty cycle (toggle the thing down)
 				// so this being half, halves the duty cycle
-				TPM1_C0V = (FREQ_2_MOD(rickrollStart[i])) / 2; 
+				TPM1_C0V = (FREQ_MOD(rickrollStart[i])) / 2; 
 				osDelay(1000);
 			}
 			isStart = true;
@@ -472,20 +468,20 @@ void tAudio(void *argument){
 		else if (currentCommand == 'c') {
 			for (int i=0; i<15; i++){
 				// mod determines period
-				TPM1->MOD = FREQ_2_MOD(rickrollChorus[i]);
+				TPM1->MOD = FREQ_MOD(rickrollChorus[i]);
 				// C0V is the one that determines duty cycle (toggle the thing down)
 				// so this being half, halves the duty cycle
-				TPM1_C0V = (FREQ_2_MOD(rickrollChorus[i])) / 2; 
+				TPM1_C0V = (FREQ_MOD(rickrollChorus[i])) / 2; 
 				osDelay(1000);
 			}
 		}
 		else if (currentCommand == 'f') {
 			for (int i=0; i<12; i++){
 				// mod determines period
-				TPM1->MOD = FREQ_2_MOD(rickrollStart[i]);
+				TPM1->MOD = FREQ_MOD(rickrollStart[i]);
 				// C0V is the one that determines duty cycle (toggle the thing down)
 				// so this being half, halves the duty cycle
-				TPM1_C0V = (FREQ_2_MOD(rickrollStart[i])) / 2; 
+				TPM1_C0V = (FREQ_MOD(rickrollStart[i])) / 2; 
 				osDelay(1000);
 			}
 		}

@@ -31,15 +31,25 @@ volatile char currentCommand = 0;
 
 // Motors
 //	F front B back C clockwise CC counter clockwise
-#define PIN_MOTOR_LEFT_FC	 3 //PTB3 
-#define PIN_MOTOR_LEFT_FCC 2 //PTB2
-#define PIN_MOTOR_LEFT_BC	 1 //PTB1
-#define PIN_MOTOR_LEFT_BCC 0 //PTB0
+/*#define PIN_MOTOR_LEFT_FC	 1 //PTC1 : TPM0_CH0 
+#define PIN_MOTOR_LEFT_FCC 2 //PTC2 : TPM0_CH1
+#define PIN_MOTOR_LEFT_BC	 29 //PTE29 : TPM0_CH2
+#define PIN_MOTOR_LEFT_BCC 30 //PTE30 : TPM0_CH3
 	
-#define PIN_MOTOR_RIGHT_FC	24//PTE24	 
-#define PIN_MOTOR_RIGHT_FCC	25//PTE25
-#define PIN_MOTOR_RIGHT_BC	29//PTE29
-#define PIN_MOTOR_RIGHT_BCC	30//PTE30
+#define PIN_MOTOR_RIGHT_FC	31//PTE31 : TPM0_CH4	 
+#define PIN_MOTOR_RIGHT_FCC	5//PTD5  :TPM0_CH5
+#define PIN_MOTOR_RIGHT_BC	2//PTB2 : TPM2_CH0
+#define PIN_MOTOR_RIGHT_BCC	3//PTB3 : TPM2_CH1
+*/
+#define PIN_MOTOR_RIGHT_FC	 1 //PTC1 : TPM0_CH0 alt4
+#define PIN_MOTOR_RIGHT_FCC 2 //PTC2 : TPM0_CH1 alt4
+#define PIN_MOTOR_RIGHT_BC	 29 //PTE29 : TPM0_CH2 alt3
+#define PIN_MOTOR_RIGHT_BCC 30 //PTE30 : TPM0_CH3 alt 3
+	
+#define PIN_MOTOR_LEFT_FC	31//PTE31 : TPM0_CH4 alt 3
+#define PIN_MOTOR_LEFT_FCC	5//PTD5  :TPM0_CH5 alt4
+#define PIN_MOTOR_LEFT_BC	2//PTB2 : TPM2_CH0 alt 3
+#define PIN_MOTOR_LEFT_BCC	3//PTB3 : TPM2_CH1 alt 3
 
 #define MOD_VALUE 10000
 
@@ -259,32 +269,32 @@ void initMotors(){
 	SIM_SCGC5 |= SIM_SCGC5_PORTB_MASK;
 	SIM_SCGC5 |= SIM_SCGC5_PORTD_MASK;
 	
-	//Use TPM2 CH1
-	PORTB->PCR[PIN_MOTOR_LEFT_FC] &= ~PORT_PCR_MUX_MASK;
-	PORTB->PCR[PIN_MOTOR_LEFT_FC] |= PORT_PCR_MUX(3);
-	//Use TPM2 CH0
-	PORTB->PCR[PIN_MOTOR_LEFT_FCC] &= ~PORT_PCR_MUX_MASK;
-	PORTB->PCR[PIN_MOTOR_LEFT_FCC] |= PORT_PCR_MUX(3);
-	//Use TPM1 CH1
+	//Use TPM0 CH0
+	PORTC->PCR[PIN_MOTOR_RIGHT_FC] &= ~PORT_PCR_MUX_MASK;
+	PORTC->PCR[PIN_MOTOR_RIGHT_FC] |= PORT_PCR_MUX(4);
+	//Use TPM0 CH1
+	PORTC->PCR[PIN_MOTOR_RIGHT_FCC] &= ~PORT_PCR_MUX_MASK;
+	PORTC->PCR[PIN_MOTOR_RIGHT_FCC] |= PORT_PCR_MUX(4);
+	//Use TPM0 CH2
+	PORTE->PCR[PIN_MOTOR_RIGHT_BC] &= ~PORT_PCR_MUX_MASK;
+	PORTE->PCR[PIN_MOTOR_RIGHT_BC] |= PORT_PCR_MUX(3);
+	//Use TPM0 CH3
+	PORTE->PCR[PIN_MOTOR_RIGHT_BCC] &= ~PORT_PCR_MUX_MASK;
+	PORTE->PCR[PIN_MOTOR_RIGHT_BCC] |= PORT_PCR_MUX(3);
+	//Use TPM0 CH4
+	PORTE->PCR[PIN_MOTOR_LEFT_FC] &= ~PORT_PCR_MUX_MASK;
+	PORTE->PCR[PIN_MOTOR_LEFT_FC] |= PORT_PCR_MUX(3);
+	//Use TMP0 CH5
+	PORTD->PCR[PIN_MOTOR_LEFT_FCC] &= ~PORT_PCR_MUX_MASK;
+	PORTD->PCR[PIN_MOTOR_LEFT_FCC] |= PORT_PCR_MUX(4);
+	//Use TMP2 CH0
 	PORTB->PCR[PIN_MOTOR_LEFT_BC] &= ~PORT_PCR_MUX_MASK;
 	PORTB->PCR[PIN_MOTOR_LEFT_BC] |= PORT_PCR_MUX(3);
-	//Use TPM1 CH0
+	//Use TPM2 CH1
 	PORTB->PCR[PIN_MOTOR_LEFT_BCC] &= ~PORT_PCR_MUX_MASK;
 	PORTB->PCR[PIN_MOTOR_LEFT_BCC] |= PORT_PCR_MUX(3);
-	//Use TPM0 CH0
-	PORTD->PCR[PIN_MOTOR_RIGHT_FC] &= ~PORT_PCR_MUX_MASK;
-	PORTD->PCR[PIN_MOTOR_RIGHT_FC] |= PORT_PCR_MUX(3);
-	//Use TMP0 CH 1
-	PORTD->PCR[PIN_MOTOR_RIGHT_FCC] &= ~PORT_PCR_MUX_MASK;
-	PORTD->PCR[PIN_MOTOR_RIGHT_FCC] |= PORT_PCR_MUX(3);
-	//Use TMP0 CH2
-	PORTD->PCR[PIN_MOTOR_RIGHT_BC] &= ~PORT_PCR_MUX_MASK;
-	PORTD->PCR[PIN_MOTOR_RIGHT_BC] |= PORT_PCR_MUX(3);
-	//Use TPM0 CH3
-	PORTD->PCR[PIN_MOTOR_RIGHT_BCC] &= ~PORT_PCR_MUX_MASK;
-	PORTD->PCR[PIN_MOTOR_RIGHT_BCC] |= PORT_PCR_MUX(3);
 
-	SIM->SCGC6 |= SIM_SCGC6_TPM1_MASK;
+	//Enable clock for tpm0 and tpm 2
 	SIM->SCGC6 |= SIM_SCGC6_TPM2_MASK;
 	SIM->SCGC6 |= SIM_SCGC6_TPM0_MASK;
 	
@@ -292,18 +302,15 @@ void initMotors(){
 	// TPMSRC are bits 24/25
 	SIM->SOPT2 &= ~SIM_SOPT2_TPMSRC_MASK;
 	SIM->SOPT2 |= SIM_SOPT2_TPMSRC(1);
+	
 	//cnv 1000 corresponds to 10 percent
-	TPM0->MOD = MOD_VALUE;
-	TPM1->MOD = MOD_VALUE;
-	TPM2->MOD = MOD_VALUE;
+	TPM0->MOD = 10000;
+	TPM2->MOD = 10000;
+	
 	//Prescalar : divide by 128
 	TPM0->SC &= ~((TPM_SC_CMOD_MASK) | (TPM_SC_PS_MASK));
 	TPM0->SC |= (TPM_SC_CMOD(1) | TPM_SC_PS(7));
 	TPM0->SC &= ~TPM_SC_CPWMS_MASK;
-	
-	TPM1->SC &= ~((TPM_SC_CMOD_MASK) | (TPM_SC_PS_MASK));
-	TPM1->SC |= (TPM_SC_CMOD(1) | TPM_SC_PS(7));
-	TPM1->SC &= ~TPM_SC_CPWMS_MASK;
 	
 	TPM2->SC &= ~((TPM_SC_CMOD_MASK) | (TPM_SC_PS_MASK));
 	TPM2->SC |= (TPM_SC_CMOD(1) | TPM_SC_PS(7));
@@ -311,18 +318,6 @@ void initMotors(){
 	
 	
 	// Enable PWM on TPM1 Channel 0 -> PTB0
-	TPM2_C1SC &= ~((TPM_CnSC_ELSB_MASK) | (TPM_CnSC_ELSA_MASK) | (TPM_CnSC_MSB_MASK) | (TPM_CnSC_MSA_MASK));
-	TPM2_C1SC |= (TPM_CnSC_ELSB(1) | TPM_CnSC_MSB(1));
-	
-	TPM2_C0SC &= ~((TPM_CnSC_ELSB_MASK) | (TPM_CnSC_ELSA_MASK) | (TPM_CnSC_MSB_MASK) | (TPM_CnSC_MSA_MASK));
-	TPM2_C0SC |= (TPM_CnSC_ELSB(1) | TPM_CnSC_MSB(1));
-	
-	TPM1_C1SC &= ~((TPM_CnSC_ELSB_MASK) | (TPM_CnSC_ELSA_MASK) | (TPM_CnSC_MSB_MASK) | (TPM_CnSC_MSA_MASK));
-	TPM1_C1SC |= (TPM_CnSC_ELSB(1) | TPM_CnSC_MSB(1));
-	
-	TPM1_C0SC &= ~((TPM_CnSC_ELSB_MASK) | (TPM_CnSC_ELSA_MASK) | (TPM_CnSC_MSB_MASK) | (TPM_CnSC_MSA_MASK));
-	TPM1_C0SC |= (TPM_CnSC_ELSB(1) | TPM_CnSC_MSB(1));
-	
 	TPM0_C0SC &= ~((TPM_CnSC_ELSB_MASK) | (TPM_CnSC_ELSA_MASK) | (TPM_CnSC_MSB_MASK) | (TPM_CnSC_MSA_MASK));
 	TPM0_C0SC |= (TPM_CnSC_ELSB(1) | TPM_CnSC_MSB(1));
 	
@@ -335,47 +330,73 @@ void initMotors(){
 	TPM0_C3SC &= ~((TPM_CnSC_ELSB_MASK) | (TPM_CnSC_ELSA_MASK) | (TPM_CnSC_MSB_MASK) | (TPM_CnSC_MSA_MASK));
 	TPM0_C3SC |= (TPM_CnSC_ELSB(1) | TPM_CnSC_MSB(1));
 	
+	TPM0_C4SC &= ~((TPM_CnSC_ELSB_MASK) | (TPM_CnSC_ELSA_MASK) | (TPM_CnSC_MSB_MASK) | (TPM_CnSC_MSA_MASK));
+	TPM0_C4SC |= (TPM_CnSC_ELSB(1) | TPM_CnSC_MSB(1));
+	
+	TPM0_C5SC &= ~((TPM_CnSC_ELSB_MASK) | (TPM_CnSC_ELSA_MASK) | (TPM_CnSC_MSB_MASK) | (TPM_CnSC_MSA_MASK));
+	TPM0_C5SC |= (TPM_CnSC_ELSB(1) | TPM_CnSC_MSB(1));
+	
+	TPM2_C0SC &= ~((TPM_CnSC_ELSB_MASK) | (TPM_CnSC_ELSA_MASK) | (TPM_CnSC_MSB_MASK) | (TPM_CnSC_MSA_MASK));
+	TPM2_C0SC |= (TPM_CnSC_ELSB(1) | TPM_CnSC_MSB(1));
+	
+	TPM2_C1SC &= ~((TPM_CnSC_ELSB_MASK) | (TPM_CnSC_ELSA_MASK) | (TPM_CnSC_MSB_MASK) | (TPM_CnSC_MSA_MASK));
+	TPM2_C1SC |= (TPM_CnSC_ELSB(1) | TPM_CnSC_MSB(1));
+	
 	//Initialise all all CNV values to 0. Functions to move will edit this value
-	TPM2_C1V = 0;
 	TPM2_C0V = 0;
-	TPM1_C0V = 0;
-	TPM1_C1V = 0;
+	TPM2_C1V = 0;
 	TPM0_C0V = 0;
 	TPM0_C1V = 0;
 	TPM0_C2V = 0;
 	TPM0_C3V = 0;
+	TPM0_C4V = 0;
+	TPM0_C5V = 0;
+}
+int calcCnv(int dutyCycle){
+	return ((dutyCycle / 100) * 10000);
 }
 
-void moveLeftFrontClockwise(int dutyCycle){
-	TPM2_C1V = (dutyCycle / 100) * (MOD_VALUE+1);
+void moveRightFrontCounterClockwise(int cnvValue){
+	TPM0_C0V = cnvValue;
 }
 
-void moveLeftFrontCounterClockwise(int dutyCycle){
-	TPM2_C0V = (dutyCycle / 100) * (MOD_VALUE+1);
+void moveRightFrontClockwise(int cnvValue){
+	TPM0_C1V = cnvValue;
 }
 
-void moveLeftBackClockwise(int dutyCycle){
-	TPM1_C1V = (dutyCycle / 100) * (MOD_VALUE+1);
+void moveRightBackCounterClockwise(int cnvValue){
+	TPM0_C2V = cnvValue;
 }
 
-void moveLeftBackCounterClockwise(int dutyCycle){
-	TPM1_C0V = (dutyCycle / 100) * (MOD_VALUE+1);
+void moveRightBackClockwise(int cnvValue){
+	TPM0_C3V = cnvValue;
 }
 
-void moveRightFrontClockwise(int dutyCycle){
-	TPM0_C0V = (dutyCycle / 100) * (MOD_VALUE+1);
+void moveLeftFrontClockwise(int cnvValue){
+	TPM0_C4V = cnvValue;
 }
 
-void moveRightFrontCounterClockwise(int dutyCycle){
-	TPM0_C1V = (dutyCycle / 100) * (MOD_VALUE+1);
+void moveLeftFrontCounterClockwise(int cnvValue){
+	TPM0_C5V = cnvValue;
 }
 
-void moveRightBackClockwise(int dutyCycle){
-	TPM0_C2V = (dutyCycle / 100) * (MOD_VALUE+1);
+void moveLeftBackClockwise(int cnvValue){
+	TPM2_C0V = cnvValue;
 }
 
-void moveRightBackCounterClockwise(int dutyCycle){
-	TPM0_C3V = (dutyCycle / 100) * (MOD_VALUE+1);
+void moveLeftBackCounterClockwise(int cnvValue){
+	TPM2_C1V = cnvValue;
+}
+
+void stopMotors(){
+	TPM2_C0V = 0;
+	TPM2_C1V = 0;
+	TPM0_C0V = 0;
+	TPM0_C1V = 0;
+	TPM0_C2V = 0;
+	TPM0_C3V = 0;
+	TPM0_C4V = 0;
+	TPM0_C5V = 0;
 }
 
 //Flash red LED on and off 500ms or 250ms as determined
@@ -492,11 +513,11 @@ void tMotorControl() {
 
 /*----------------------------------------------------------------------------
  * CMSIS-RTOS 'main' function template
- *---------------------------------------------------------------------------*/
+ ---------------------------------------------------------------------------*/
  
 /*----------------------------------------------------------------------------
  * Application main thread
- *---------------------------------------------------------------------------*/
+ ---------------------------------------------------------------------------*/
 const osThreadAttr_t thread_attr = {
 	.priority = osPriorityNormal1
 };
@@ -513,17 +534,19 @@ int main (void) {
   SystemCoreClockUpdate();
 	initLed();
 	initUART2(9600);
+	initMotors();
+	
 	while (1) {
-		moveLeftBackClockwise(75);
-		delay(5000);
-		moveLeftBackCounterClockwise(75);
-		delay(5000);
-		moveLeftFrontCounterClockwise(75);
-		delay(5000);
-		moveLeftFrontClockwise(75);
-		delay(5000);
-		
+		//moveLeftFrontClockwise(2500);
+		//moveLeftFrontCounterClockwise(2500);
+		//moveLeftBackClockwise(2500);
+		//moveLeftBackCounterClockwise(2500);
+		//moveRightFrontClockwise(2500);
+		//moveRightFrontCounterClockwise(2500);
+	  //moveRightBackClockwise(2500);
+		//stopMotors();
 	}
+}
 /*
   osKernelInitialize();                 // Initialize CMSIS-RTOS
 	osThreadNew(tBrain, NULL, NULL);			// self explanatory
@@ -532,6 +555,4 @@ int main (void) {
   osThreadNew(tAudio, NULL, NULL);    // Create application main thread
   osKernelStart();  
 */	// Start thread execution
-//  for (;;) {}
-}
-
+ // for (;;) {}

@@ -27,7 +27,6 @@ int rickrollChorus[] ={ 233, 261, 277, 293, 349, 349, 311, 207, 233, 261, 207, 3
 
 static int gLedPos[] ={ 3, 4, 5, 6, 10, 11, 12, 13 };
 volatile uint8_t ledCounter = 0;
-volatile char currentCommand = 0;
 
 // Motors
 //	F front B back C clockwise CC counter clockwise
@@ -73,15 +72,22 @@ volatile char currentCommand = 0;
 #define UART_RX_PORTE23 23
 #define UART2_INT_PRIO 128
 
+volatile int currentCommand = 0;
+bool isMoving;
+
 #define Q_SIZE (32)
 
-//Delay function from lecture
+//Delay function from lecture USE OSdelay() FOR RTOS!!
 static void delay(volatile uint32_t nof) {
 	while (nof != 0) {
 		__asm("NOP");
 		nof--;
 	}
 }
+
+enum color_t {	
+RED, GREEN, BLUE
+};
 
 //////////////////////////
 // CODE CHUNK FOR AUDIO //
@@ -124,7 +130,7 @@ void initPWMBuzzer() {
 // ////////////////////////////
 // CODE CHUNK FOR QUEUE HERE //
 // struct for queue ///////////
-
+/*
 typedef struct {
 	uint8_t Data[Q_SIZE];
 	unsigned int Head; //points to oldest data element
@@ -134,11 +140,8 @@ typedef struct {
 
 //declaration of tx queue and rx queue
 Q_T tx_q, rx_q;
-
-enum color_t {	
-RED, GREEN, BLUE
-};
-
+*/
+/*
 // ISR for UART
 int Q_Empty(Q_T * q) {
 	return q->Size == 0;
@@ -179,7 +182,7 @@ unsigned char Q_Dequeue(Q_T * q) {
 	}
 	return t;
 }
-
+*/
 void initUART2(uint32_t baudrate)
 {
 	uint32_t divisor, bus_clock;
@@ -212,8 +215,8 @@ void initUART2(uint32_t baudrate)
 	UART2->C2 |= UART_C2_TIE_MASK |
 		UART_C2_RIE_MASK;
 	UART2->C2 |= UART_C2_RIE_MASK;
-	Q_Init(&tx_q);
-	Q_Init(&rx_q);
+	//Q_Init(&tx_q);
+	//Q_Init(&rx_q);
 }
 
 void UART2_IRQHandler() {
@@ -221,16 +224,19 @@ void UART2_IRQHandler() {
 	// for transmit
 	if (UART2->S1 & UART_S1_TDRE_MASK) {
 		// can send another character
-		if (!Q_Empty(&tx_q)) {
+		/*if (!Q_Empty(&tx_q)) {
 			UART2->D = Q_Dequeue(&tx_q);
 		}
 		else {
 			// queue is empty so disable tx
 			UART2->C2 &= ~UART_C2_TIE_MASK;
-		}
+		}*/
 	}
 	// for receiver
 	if (UART2->S1 & UART_S1_RDRF_MASK) {
+		// assigns integer to current command
+		currentCommand =  UART2->D;
+		/*
 		// received a character
 		if (!Q_Full(&rx_q)) {
 			Q_Enqueue(&rx_q, UART2->D);
@@ -240,6 +246,7 @@ void UART2_IRQHandler() {
 			while (1)
 				;
 		}
+		*/
 	}
 	if (UART2->S1 & (UART_S1_OR_MASK |
 		UART_S1_NF_MASK |
@@ -423,7 +430,8 @@ void flashGreen(int delayTime) {
 	while (1) {
 		PTC->PSOR |= GREEN_LED_MASK;
 		osDelay(delayTime);
-		PTC->PCOR |= GREEN_LED_MASK;
+		// doesnt need to turn off when it's stationary
+		//PTC->PCOR |= GREEN_LED_MASK;
 		osDelay(delayTime);
 	}
 }
@@ -442,24 +450,45 @@ void alternatingGreen(int delayTime) {
 
 
 void tBrain(void *argument) {
+	int hold;
 	for (;;)
 	{
-		uint8_t c = Q_Dequeue(&rx_q);
-		if (c != 0 || c != currentCommand) {
-			currentCommand = c;
+		// to check if command changed
+		if (currentCommand != hold || currentCommand != 0) 
+		{
+			hold = currentCommand;
+		}
+		//to check if is moving
+		if (hold >= 1 || hold <= 8) 
+		{
+			isMoving = true;
 		}
 	}
 }
 
-void tLED() {
+void tLEDGreen(void *argument) {
 	for (;;)
 	{
-		//if (stop condition) {
-		// do action
-		//}
-		//else if (move condition) {
-		// do action
-		//}
+		if (isMoving == false) {
+			flashGreen(0);
+			tLEDRED(250);
+		}
+		else if (isMoving == true) {
+			alternatingGreen(100);
+			tLEDRED(500);
+		}
+	}
+}
+
+void tLEDRed(void *argument) {
+	for (;;)
+	{
+		if (isMoving == false) {
+			tLEDRED(250);
+		}
+		else if (isMoving == true) {
+			tLEDRED(500);
+		}
 	}
 }
 
@@ -484,7 +513,6 @@ void tAudio(void *argument) {
 					// mod determines period
 					TPM1->MOD = FREQ_MOD(rickrollChorus[i]);
 					// C0V is the one that determines duty cycle (toggle the thing down)
-					// so this being half, halves the duty cycle
 					TPM1_C0V = (FREQ_MOD(rickrollChorus[i])) / 2;
 					delay(900000);
 				}
@@ -493,8 +521,7 @@ void tAudio(void *argument) {
 				for (int i=0; i<12; i++) {
 					// mod determines period
 					TPM1->MOD = FREQ_MOD(rickrollStart[i]);
-					// C0V is the one that determines duty cycle (toggle the thing down)
-					// so this being half, halves the duty cycle
+					// C0V is the one that determines duty cycle
 					TPM1_C0V = (FREQ_MOD(rickrollStart[i])) / 2;
 					delay(900000);
 				}
@@ -507,12 +534,12 @@ void tAudio(void *argument) {
 void tMotorControl() {
 	for (;;)
 	{
-		//if (stop condition) {
+		if (isMoving == false) {
+			stopMotors();
+		}
+		else if (isMoving == true) {
 		// do action
-		//}
-		//else if (move forward condition) {
-		// do action
-		//}
+		}
 	}
 }
 
@@ -523,9 +550,9 @@ void tMotorControl() {
  /*----------------------------------------------------------------------------
   * Application main thread
   ---------------------------------------------------------------------------*/
-const osThreadAttr_t thread_attr ={
+/*const osThreadAttr_t thread_attr ={
 	.priority = osPriorityNormal1
-};
+};*/
 void app_main(void *argument) {
 
 	// ...
@@ -537,27 +564,35 @@ int main(void) {
 
 	// System Initialization
 	SystemCoreClockUpdate();
+	
+	//init everything
 	initLed();
 	initUART2(9600);
 	initMotors();
-
-	while (1) {
-		//moveLeftFrontClockwise(2500);
-		//moveLeftFrontCounterClockwise(2500);
-		//moveLeftBackClockwise(2500);
-		//moveLeftBackCounterClockwise(2500);
-		//moveRightFrontClockwise(2500);
-		//moveRightFrontCounterClockwise(2500);
-	  //moveRightBackClockwise(2500);
-		//stopMotors();
-	}
-}
-/*
-  osKernelInitialize();                 // Initialize CMSIS-RTOS
+	initPWMBuzzer();
+	
+	// put everything into threads
+	osKernelInitialize();                 // Initialize CMSIS-RTOS
 	osThreadNew(tBrain, NULL, NULL);			// self explanatory
-
+	osThreadNew(tLEDGreen, NULL, NULL);			// self explanatory
+	osThreadNew(tLEDRed, NULL, NULL);			// self explanatory
   osThreadNew(app_main, NULL, NULL);    // Create application main thread
   osThreadNew(tAudio, NULL, NULL);    // Create application main thread
   osKernelStart();
-*/	// Start thread execution
-// for (;;) {}
+// Start thread execution
+	for (;;) {
+
+		while (1) {
+			//moveLeftFrontClockwise(2500);
+			//moveLeftFrontCounterClockwise(2500);
+			//moveLeftBackClockwise(2500);
+			//moveLeftBackCounterClockwise(2500);
+			//moveRightFrontClockwise(2500);
+			//moveRightFrontCounterClockwise(2500);
+			//moveRightBackClockwise(2500);
+			//stopMotors();
+		}
+	}
+}
+
+

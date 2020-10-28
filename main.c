@@ -574,6 +574,7 @@ int main(void) {
 	// put everything into threads
 	osKernelInitialize();                 // Initialize CMSIS-RTOS
 	osThreadNew(tBrain, NULL, NULL);			// self explanatory
+	osThreadNew(tMotorControl, NULL, NULL);
 	osThreadNew(tLEDGreen, NULL, NULL);			// self explanatory
 	osThreadNew(tLEDRed, NULL, NULL);			// self explanatory
   osThreadNew(app_main, NULL, NULL);    // Create application main thread

@@ -480,10 +480,16 @@ void tLEDRed(void *argument) {
 	for (;;)
 	{
 		if (isMoving == false) {
-			tLEDRED(250);
+		PTC->PSOR |= MASK(PIN_RLED);
+		osDelay(250);
+		PTC->PCOR |= MASK(PIN_RLED);
+		osDelay(250);
 		}
 		else if (isMoving == true) {
-			tLEDRED(500);
+		PTC->PSOR |= MASK(PIN_RLED);
+		osDelay(500);
+		PTC->PCOR |= MASK(PIN_RLED);
+		osDelay(500);
 		}
 	}
 }

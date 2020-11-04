@@ -44,13 +44,13 @@ volatile uint8_t ledCounter = 0;
 #define TEST_AUDIO2 0
 
 
-// ??
-#define RED_LED 18   // PortB Pin 18
-#define GREEN_LED 19 // PortB Pin 19
-#define BLUE_LED 1   // PortD Pin 1
-#define SWITCH 6    // PortD Pin 6
+// Legacy code
+//#define RED_LED 18   // PortB Pin 18
+//#define GREEN_LED 19 // PortB Pin 19
+//#define BLUE_LED 1   // PortD Pin 1
+//#define SWITCH 6    // PortD Pin 6
 #define MASK(x) (1 << (x))
-#define PIN_NUM 3 
+//#define PIN_NUM 3 
 
 
 // UART
@@ -421,52 +421,36 @@ void tMotorControl() {
 		osEventFlagsClear(motorFlag, 0x0001);
 		if (direction != 0) {
 			if (direction == 1){ //forward
-				moveRightFrontClockwise(100);
-				moveRightBackClockwise(100);
-				moveLeftFrontCounterClockwise(100);
-				moveLeftBackCounterClockwise(100);
+				moveRightClockwise(1000);
+				moveLeftClockwise(1000);
 				
 			} else if (direction == 2){ //backward
-				moveRightFrontCounterClockwise(100);
-				moveRightBackCounterClockwise(100);
-				moveLeftFrontClockwise(100);
-				moveLeftBackClockwise(100);
+				moveRightCounterClockwise(1000);
+				moveLeftCounterClockwise(1000);
 				
 			} else if (direction == 3){ //turn left
-				moveRightFrontClockwise(100);
-				moveRightBackClockwise(100);
-				moveLeftFrontClockwise(100);
-				moveLeftBackClockwise(100);
+				moveRightCounterClockwise(1000);
+				moveLeftClockwise(1000);
 				
 			} else if (direction == 4){ //turn right
-				moveRightFrontCounterClockwise(100);
-				moveRightBackCounterClockwise(100);
-				moveLeftFrontClockwise(100);
-				moveLeftBackClockwise(100);
+				moveRightClockwise(1000);
+				moveLeftCounterClockwise(1000);
 				
 			} else if (direction == 5){ //forward left
-				moveRightFrontClockwise(100);
-				moveRightBackClockwise(100);
-				moveLeftFrontCounterClockwise(50);
-				moveLeftBackCounterClockwise(50);
+				moveRightClockwise(1000);
+				moveLeftClockwise(2000);
 				
 			} else if (direction == 6){ //forward right
-				moveRightFrontClockwise(50);
-				moveRightBackClockwise(50);
-				moveLeftFrontCounterClockwise(100);
-				moveLeftBackCounterClockwise(100);
+				moveRightClockwise(2000);
+				moveLeftClockwise(1000);
 				
 			} else if (direction == 7){ //reverse left
-				moveRightFrontCounterClockwise(100);
-				moveRightBackCounterClockwise(100);
-				moveLeftFrontClockwise(50);
-				moveLeftBackClockwise(50);
+				moveRightCounterClockwise(2000);
+				moveLeftCounterClockwise(1000);
 				
 			} else if (direction == 8){ //reverse right
-				moveRightFrontCounterClockwise(50);
-				moveRightBackCounterClockwise(50);
-				moveLeftFrontClockwise(100);
-				moveLeftBackClockwise(100);
+				moveRightCounterClockwise(1000);
+				moveLeftCounterClockwise(2000);
 				
 			}
 		}

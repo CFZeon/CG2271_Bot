@@ -29,16 +29,11 @@ static int gLedPos[] ={ 3, 4, 5, 6, 10, 11, 12, 13 };
 volatile uint8_t ledCounter = 0;
 
 // Motors
-//	F front B back C clockwise CC counter clockwise
-#define PIN_MOTOR_RIGHT_FC	 1 //PTC1 : TPM0_CH0 alt4
-#define PIN_MOTOR_RIGHT_FCC 2 //PTC2 : TPM0_CH1 alt4
-#define PIN_MOTOR_RIGHT_BC	 29 //PTE29 : TPM0_CH2 alt3
-#define PIN_MOTOR_RIGHT_BCC 30 //PTE30 : TPM0_CH3 alt 3
-
-#define PIN_MOTOR_LEFT_FC	31//PTE31 : TPM0_CH4 alt 3
-#define PIN_MOTOR_LEFT_FCC	5//PTD5  :TPM0_CH5 alt4
-#define PIN_MOTOR_LEFT_BC	2//PTB2 : TPM2_CH0 alt 3
-#define PIN_MOTOR_LEFT_BCC	3//PTB3 : TPM2_CH1 alt 3
+//C clockwise CC counter clockwise
+#define PIN_MOTOR_RIGHT_C	 0 //PTD0 : TPM0_CH0 ALT4
+#define PIN_MOTOR_RIGHT_CC 	 1 //PTD1 : TPM0_CH1 ALT4
+#define PIN_MOTOR_LEFT_C	 2 //PTD2 : TPM0_CH2 ALT4
+#define PIN_MOTOR_LEFT_CC	 3 //PTD3 : TPM0_CH3 ALT4
 
 #define MOD_VALUE 10000
 
@@ -77,27 +72,21 @@ osThreadId_t motorFlag;
 // TEST CODE CHUNK //
 /////////////////////
 
-void initMotor2() {
-	//PIN_MOTOR_RIGHT_FC	 1 //PTC1 : TPM0_CH0 alt4
-	//PIN_MOTOR_RIGHT_FCC 2 //PTC2 : TPM0_CH1 alt4
-	//PIN_MOTOR_RIGHT_BC	 29 //PTE29 : TPM0_CH2 alt3
-	//PIN_MOTOR_RIGHT_BCC 30 //PTE30 : TPM0_CH3 alt 3
-	
-	SIM_SCGC5 |= SIM_SCGC5_PORTC_MASK;
-	SIM_SCGC5 |= SIM_SCGC5_PORTE_MASK;
+void initMotor() {
+	SIM_SCGC5 |= SIM_SCGC5_PORTD_MASK;
 	
 	//Use TPM0 CH0
-	PORTC->PCR[PIN_MOTOR_RIGHT_FC] &= ~PORT_PCR_MUX_MASK;
-	PORTC->PCR[PIN_MOTOR_RIGHT_FC] |= PORT_PCR_MUX(4);
+	PORTD->PCR[PIN_MOTOR_RIGHT_C] &= ~PORT_PCR_MUX_MASK;
+	PORTD->PCR[PIN_MOTOR_RIGHT_C] |= PORT_PCR_MUX(4);
 	//Use TPM0 CH1
-	PORTC->PCR[PIN_MOTOR_RIGHT_FCC] &= ~PORT_PCR_MUX_MASK;
-	PORTC->PCR[PIN_MOTOR_RIGHT_FCC] |= PORT_PCR_MUX(4);
+	PORTD->PCR[PIN_MOTOR_RIGHT_CC] &= ~PORT_PCR_MUX_MASK;
+	PORTD->PCR[PIN_MOTOR_RIGHT_CC] |= PORT_PCR_MUX(4);
 	//Use TPM0 CH2
-	PORTE->PCR[PIN_MOTOR_RIGHT_BC] &= ~PORT_PCR_MUX_MASK;
-	PORTE->PCR[PIN_MOTOR_RIGHT_BC] |= PORT_PCR_MUX(3);
+	PORTD->PCR[PIN_MOTOR_LEFT_C] &= ~PORT_PCR_MUX_MASK;
+	PORTD->PCR[PIN_MOTOR_LEFT_C] |= PORT_PCR_MUX(4);
 	//Use TPM0 CH3
-	PORTE->PCR[PIN_MOTOR_RIGHT_BCC] &= ~PORT_PCR_MUX_MASK;
-	PORTE->PCR[PIN_MOTOR_RIGHT_BCC] |= PORT_PCR_MUX(3);
+	PORTD->PCR[PIN_MOTOR_LEFT_CC] &= ~PORT_PCR_MUX_MASK;
+	PORTD->PCR[PIN_MOTOR_LEFT_CC] |= PORT_PCR_MUX(4);
 
 	//Enable clock for tpm0 
 	SIM->SCGC6 |= SIM_SCGC6_TPM0_MASK;
@@ -115,7 +104,7 @@ void initMotor2() {
 	TPM0->SC |= (TPM_SC_CMOD(1) | TPM_SC_PS(7));
 	TPM0->SC &= ~TPM_SC_CPWMS_MASK;
 
-	// Enable PWM on TPM1 Channel 0 -> PTB0
+	// Enable PWM on TPM1 Channel 0 -> PTD0
 	TPM0_C0SC &= ~((TPM_CnSC_ELSB_MASK) | (TPM_CnSC_ELSA_MASK) | (TPM_CnSC_MSB_MASK) | (TPM_CnSC_MSA_MASK));
 	TPM0_C0SC |= (TPM_CnSC_ELSB(1) | TPM_CnSC_MSB(1));
 
@@ -305,138 +294,33 @@ void initLed(void)
 	PTC->PDDR |= MASK(PIN_RLED);
 }
 
-void initMotors() {
-	SIM_SCGC5 |= SIM_SCGC5_PORTB_MASK;
-	SIM_SCGC5 |= SIM_SCGC5_PORTD_MASK;
-
-	//Use TPM0 CH0
-	PORTC->PCR[PIN_MOTOR_RIGHT_FC] &= ~PORT_PCR_MUX_MASK;
-	PORTC->PCR[PIN_MOTOR_RIGHT_FC] |= PORT_PCR_MUX(4);
-	//Use TPM0 CH1
-	PORTC->PCR[PIN_MOTOR_RIGHT_FCC] &= ~PORT_PCR_MUX_MASK;
-	PORTC->PCR[PIN_MOTOR_RIGHT_FCC] |= PORT_PCR_MUX(4);
-	//Use TPM0 CH2
-	PORTE->PCR[PIN_MOTOR_RIGHT_BC] &= ~PORT_PCR_MUX_MASK;
-	PORTE->PCR[PIN_MOTOR_RIGHT_BC] |= PORT_PCR_MUX(3);
-	//Use TPM0 CH3
-	PORTE->PCR[PIN_MOTOR_RIGHT_BCC] &= ~PORT_PCR_MUX_MASK;
-	PORTE->PCR[PIN_MOTOR_RIGHT_BCC] |= PORT_PCR_MUX(3);
-	//Use TPM0 CH4
-	PORTE->PCR[PIN_MOTOR_LEFT_FC] &= ~PORT_PCR_MUX_MASK;
-	PORTE->PCR[PIN_MOTOR_LEFT_FC] |= PORT_PCR_MUX(3);
-	//Use TMP0 CH5
-	PORTD->PCR[PIN_MOTOR_LEFT_FCC] &= ~PORT_PCR_MUX_MASK;
-	PORTD->PCR[PIN_MOTOR_LEFT_FCC] |= PORT_PCR_MUX(4);
-	//Use TMP2 CH0
-	PORTB->PCR[PIN_MOTOR_LEFT_BC] &= ~PORT_PCR_MUX_MASK;
-	PORTB->PCR[PIN_MOTOR_LEFT_BC] |= PORT_PCR_MUX(3);
-	//Use TPM2 CH1
-	PORTB->PCR[PIN_MOTOR_LEFT_BCC] &= ~PORT_PCR_MUX_MASK;
-	PORTB->PCR[PIN_MOTOR_LEFT_BCC] |= PORT_PCR_MUX(3);
-
-	//Enable clock for tpm0 and tpm 2
-	SIM->SCGC6 |= SIM_SCGC6_TPM2_MASK;
-	SIM->SCGC6 |= SIM_SCGC6_TPM0_MASK;
-
-	// this selects the clock source for the TPM counter clock
-	// TPMSRC are bits 24/25
-	SIM->SOPT2 &= ~SIM_SOPT2_TPMSRC_MASK;
-	SIM->SOPT2 |= SIM_SOPT2_TPMSRC(1);
-
-	//cnv 1000 corresponds to 10 percent
-	TPM0->MOD = 10000;
-	TPM2->MOD = 10000;
-
-	//Prescalar : divide by 128
-	TPM0->SC &= ~((TPM_SC_CMOD_MASK) | (TPM_SC_PS_MASK));
-	TPM0->SC |= (TPM_SC_CMOD(1) | TPM_SC_PS(7));
-	TPM0->SC &= ~TPM_SC_CPWMS_MASK;
-
-	TPM2->SC &= ~((TPM_SC_CMOD_MASK) | (TPM_SC_PS_MASK));
-	TPM2->SC |= (TPM_SC_CMOD(1) | TPM_SC_PS(7));
-	TPM2->SC &= ~TPM_SC_CPWMS_MASK;
-
-
-	// Enable PWM on TPM1 Channel 0 -> PTB0
-	TPM0_C0SC &= ~((TPM_CnSC_ELSB_MASK) | (TPM_CnSC_ELSA_MASK) | (TPM_CnSC_MSB_MASK) | (TPM_CnSC_MSA_MASK));
-	TPM0_C0SC |= (TPM_CnSC_ELSB(1) | TPM_CnSC_MSB(1));
-
-	TPM0_C1SC &= ~((TPM_CnSC_ELSB_MASK) | (TPM_CnSC_ELSA_MASK) | (TPM_CnSC_MSB_MASK) | (TPM_CnSC_MSA_MASK));
-	TPM0_C1SC |= (TPM_CnSC_ELSB(1) | TPM_CnSC_MSB(1));
-
-	TPM0_C2SC &= ~((TPM_CnSC_ELSB_MASK) | (TPM_CnSC_ELSA_MASK) | (TPM_CnSC_MSB_MASK) | (TPM_CnSC_MSA_MASK));
-	TPM0_C2SC |= (TPM_CnSC_ELSB(1) | TPM_CnSC_MSB(1));
-
-	TPM0_C3SC &= ~((TPM_CnSC_ELSB_MASK) | (TPM_CnSC_ELSA_MASK) | (TPM_CnSC_MSB_MASK) | (TPM_CnSC_MSA_MASK));
-	TPM0_C3SC |= (TPM_CnSC_ELSB(1) | TPM_CnSC_MSB(1));
-
-	TPM0_C4SC &= ~((TPM_CnSC_ELSB_MASK) | (TPM_CnSC_ELSA_MASK) | (TPM_CnSC_MSB_MASK) | (TPM_CnSC_MSA_MASK));
-	TPM0_C4SC |= (TPM_CnSC_ELSB(1) | TPM_CnSC_MSB(1));
-
-	TPM0_C5SC &= ~((TPM_CnSC_ELSB_MASK) | (TPM_CnSC_ELSA_MASK) | (TPM_CnSC_MSB_MASK) | (TPM_CnSC_MSA_MASK));
-	TPM0_C5SC |= (TPM_CnSC_ELSB(1) | TPM_CnSC_MSB(1));
-
-	TPM2_C0SC &= ~((TPM_CnSC_ELSB_MASK) | (TPM_CnSC_ELSA_MASK) | (TPM_CnSC_MSB_MASK) | (TPM_CnSC_MSA_MASK));
-	TPM2_C0SC |= (TPM_CnSC_ELSB(1) | TPM_CnSC_MSB(1));
-
-	TPM2_C1SC &= ~((TPM_CnSC_ELSB_MASK) | (TPM_CnSC_ELSA_MASK) | (TPM_CnSC_MSB_MASK) | (TPM_CnSC_MSA_MASK));
-	TPM2_C1SC |= (TPM_CnSC_ELSB(1) | TPM_CnSC_MSB(1));
-
-	//Initialise all all CNV values to 0. Functions to move will edit this value
-	TPM2_C0V = 0;
-	TPM2_C1V = 0;
-	TPM0_C0V = 0;
-	TPM0_C1V = 0;
-	TPM0_C2V = 0;
-	TPM0_C3V = 0;
-	TPM0_C4V = 0;
-	TPM0_C5V = 0;
-}
 int calcCnv(int dutyCycle) {
 	return ((dutyCycle / 100) * 10000);
 }
 
-void moveRightFrontCounterClockwise(int cnvValue) {
+void moveRightClockwise(int cnvValue) {
 	TPM0_C0V = cnvValue;
 }
 
-void moveRightFrontClockwise(int cnvValue) {
+void moveRightCounterClockwise(int cnvValue) {
 	TPM0_C1V = cnvValue;
 }
 
-void moveRightBackCounterClockwise(int cnvValue) {
+void moveLeftClockwise(int cnvValue) {
 	TPM0_C2V = cnvValue;
 }
 
-void moveRightBackClockwise(int cnvValue) {
+void moveLeftCounterClockwise(int cnvValue) {
 	TPM0_C3V = cnvValue;
 }
 
-void moveLeftFrontClockwise(int cnvValue) {
-	TPM0_C4V = cnvValue;
-}
-
-void moveLeftFrontCounterClockwise(int cnvValue) {
-	TPM0_C5V = cnvValue;
-}
-
-void moveLeftBackClockwise(int cnvValue) {
-	TPM2_C0V = cnvValue;
-}
-
-void moveLeftBackCounterClockwise(int cnvValue) {
-	TPM2_C1V = cnvValue;
-}
 
 void stopMotors() {
-	TPM2_C0V = 0;
-	TPM2_C1V = 0;
+
 	TPM0_C0V = 0;
 	TPM0_C1V = 0;
 	TPM0_C2V = 0;
 	TPM0_C3V = 0;
-	TPM0_C4V = 0;
-	TPM0_C5V = 0;
 }
 
 //////////////////////
@@ -611,9 +495,8 @@ int main(void) {
 	//init system components
 	initLed();
 	initUART2(9600);
-	//initMotors();
 	//initPWMBuzzer();
-	initMotor2();
+	initMotor();
 	//initBuzzer2();
 	initBuzzer2();
 	
@@ -635,16 +518,11 @@ int main(void) {
 	for (;;) {
 	}
 	while (1) {
-		//moveLeftFrontClockwise(2500);
+		//moveLeftClockwise(2500);
 		//moveLeftFrontCounterClockwise(2500);
-		//moveLeftBackClockwise(2500);
-		//moveLeftBackCounterClockwise(2500);
-		//moveRightFrontClockwise(2500);
-		//moveRightFrontCounterClockwise(2500);
-		//moveRightBackClockwise(2500);
+		//moveRightClockwise(2500);
+		//moveRightCounterClockwise(2500);
 		//stopMotors();
 	}
 	
 }
-
-

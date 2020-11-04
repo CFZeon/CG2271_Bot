@@ -45,6 +45,8 @@ volatile uint8_t ledCounter = 0;
 // Buzzer
 #define PIN_AUDIO 20 // PTE20 (TPM1_CH0 ALT3)
 #define FREQ_MOD(x) (375000 / x)
+#define TEST_AUDIO 31 // PTE31 tpm0 ch4 alt3
+#define TEST_AUDIO2 0
 
 
 // ??
@@ -70,6 +72,129 @@ osThreadId_t ledFlag;
 osThreadId_t audioStartFlag;
 osThreadId_t audioFlag;
 osThreadId_t motorFlag;
+
+/////////////////////
+// TEST CODE CHUNK //
+/////////////////////
+
+void initMotor2() {
+	//PIN_MOTOR_RIGHT_FC	 1 //PTC1 : TPM0_CH0 alt4
+	//PIN_MOTOR_RIGHT_FCC 2 //PTC2 : TPM0_CH1 alt4
+	//PIN_MOTOR_RIGHT_BC	 29 //PTE29 : TPM0_CH2 alt3
+	//PIN_MOTOR_RIGHT_BCC 30 //PTE30 : TPM0_CH3 alt 3
+	
+	SIM_SCGC5 |= SIM_SCGC5_PORTC_MASK;
+	SIM_SCGC5 |= SIM_SCGC5_PORTE_MASK;
+	
+	//Use TPM0 CH0
+	PORTC->PCR[PIN_MOTOR_RIGHT_FC] &= ~PORT_PCR_MUX_MASK;
+	PORTC->PCR[PIN_MOTOR_RIGHT_FC] |= PORT_PCR_MUX(4);
+	//Use TPM0 CH1
+	PORTC->PCR[PIN_MOTOR_RIGHT_FCC] &= ~PORT_PCR_MUX_MASK;
+	PORTC->PCR[PIN_MOTOR_RIGHT_FCC] |= PORT_PCR_MUX(4);
+	//Use TPM0 CH2
+	PORTE->PCR[PIN_MOTOR_RIGHT_BC] &= ~PORT_PCR_MUX_MASK;
+	PORTE->PCR[PIN_MOTOR_RIGHT_BC] |= PORT_PCR_MUX(3);
+	//Use TPM0 CH3
+	PORTE->PCR[PIN_MOTOR_RIGHT_BCC] &= ~PORT_PCR_MUX_MASK;
+	PORTE->PCR[PIN_MOTOR_RIGHT_BCC] |= PORT_PCR_MUX(3);
+
+	//Enable clock for tpm0 
+	SIM->SCGC6 |= SIM_SCGC6_TPM0_MASK;
+
+	// this selects the clock source for the TPM counter clock
+	// TPMSRC are bits 24/25
+	SIM->SOPT2 &= ~SIM_SOPT2_TPMSRC_MASK;
+	SIM->SOPT2 |= SIM_SOPT2_TPMSRC(1);
+
+	//cnv 1000 corresponds to 10 percent
+	TPM0->MOD = 10000;
+
+	//Prescalar : divide by 128
+	TPM0->SC &= ~((TPM_SC_CMOD_MASK) | (TPM_SC_PS_MASK));
+	TPM0->SC |= (TPM_SC_CMOD(1) | TPM_SC_PS(7));
+	TPM0->SC &= ~TPM_SC_CPWMS_MASK;
+
+	// Enable PWM on TPM1 Channel 0 -> PTB0
+	TPM0_C0SC &= ~((TPM_CnSC_ELSB_MASK) | (TPM_CnSC_ELSA_MASK) | (TPM_CnSC_MSB_MASK) | (TPM_CnSC_MSA_MASK));
+	TPM0_C0SC |= (TPM_CnSC_ELSB(1) | TPM_CnSC_MSB(1));
+
+	TPM0_C1SC &= ~((TPM_CnSC_ELSB_MASK) | (TPM_CnSC_ELSA_MASK) | (TPM_CnSC_MSB_MASK) | (TPM_CnSC_MSA_MASK));
+	TPM0_C1SC |= (TPM_CnSC_ELSB(1) | TPM_CnSC_MSB(1));
+
+	TPM0_C2SC &= ~((TPM_CnSC_ELSB_MASK) | (TPM_CnSC_ELSA_MASK) | (TPM_CnSC_MSB_MASK) | (TPM_CnSC_MSA_MASK));
+	TPM0_C2SC |= (TPM_CnSC_ELSB(1) | TPM_CnSC_MSB(1));
+
+	TPM0_C3SC &= ~((TPM_CnSC_ELSB_MASK) | (TPM_CnSC_ELSA_MASK) | (TPM_CnSC_MSB_MASK) | (TPM_CnSC_MSA_MASK));
+	TPM0_C3SC |= (TPM_CnSC_ELSB(1) | TPM_CnSC_MSB(1));
+
+	//Initialise all all CNV values to 0. Functions to move will edit this value
+	TPM0_C0V = 0;
+	TPM0_C1V = 0;
+	TPM0_C2V = 0;
+	TPM0_C3V = 0;
+}
+
+void initBuzzer2() {
+	// changed to PTE31 TPM0_CH4 alt 3
+
+	// supplies power to the port
+	SIM->SCGC5 |= SIM_SCGC5_PORTE_MASK;
+
+	// 3 here sets the pin to timer mode page 163
+	PORTE->PCR[TEST_AUDIO] &= ~PORT_PCR_MUX_MASK;
+	PORTE->PCR[TEST_AUDIO] |= PORT_PCR_MUX(3);
+
+	// this bit controls the clock
+	SIM->SCGC6 |= SIM_SCGC6_TPM0_MASK;
+
+	// this selects the clock source for the TPM counter clock
+	// TPMSRC is bits 24/25
+	SIM->SOPT2 &= ~SIM_SOPT2_TPMSRC_MASK;
+	SIM->SOPT2 |= SIM_SOPT2_TPMSRC(1);
+
+	// set modulo value
+	TPM0->MOD = 10000;
+
+	// Edge-Aligned PWM
+	TPM0->SC &= ~((TPM_SC_CMOD_MASK) | (TPM_SC_PS_MASK));
+	TPM0->SC |= (TPM_SC_CMOD(1)) | (TPM_SC_PS(7));
+	TPM0->SC &= ~(TPM_SC_CPWMS_MASK);
+
+	TPM0_C4SC &= ~((TPM_CnSC_ELSB_MASK) | (TPM_CnSC_ELSA_MASK) | (TPM_CnSC_MSB_MASK) | (TPM_CnSC_MSA_MASK));
+	TPM0_C4SC |= (TPM_CnSC_ELSB(1) | TPM_CnSC_MSB(1));
+}
+
+void initBuzzer3() {
+	// changed to PTB0 tpm1 ch0 alt3
+
+	// supplies power to the port
+	SIM->SCGC5 |= SIM_SCGC5_PORTB_MASK;
+
+	// 3 here sets the pin to timer mode page 163
+	PORTB->PCR[TEST_AUDIO2] &= ~PORT_PCR_MUX_MASK;
+	PORTB->PCR[TEST_AUDIO2] |= PORT_PCR_MUX(3);
+
+	// this bit controls the clock
+	SIM->SCGC6 |= SIM_SCGC6_TPM1_MASK;
+
+	// this selects the clock source for the TPM counter clock
+	// TPMSRC is bits 24/25
+	SIM->SOPT2 &= ~SIM_SOPT2_TPMSRC_MASK;
+	SIM->SOPT2 |= SIM_SOPT2_TPMSRC(1);
+
+	// set modulo value
+	TPM1->MOD = 10000;
+
+	// Edge-Aligned PWM
+	TPM1->SC &= ~((TPM_SC_CMOD_MASK) | (TPM_SC_PS_MASK));
+	TPM1->SC |= (TPM_SC_CMOD(1)) | (TPM_SC_PS(7));
+	TPM1->SC &= ~(TPM_SC_CPWMS_MASK);
+
+	TPM1_C0SC &= ~((TPM_CnSC_ELSB_MASK) | (TPM_CnSC_ELSA_MASK) | (TPM_CnSC_MSB_MASK) | (TPM_CnSC_MSA_MASK));
+	TPM1_C0SC |= (TPM_CnSC_ELSB(1) | TPM_CnSC_MSB(1));
+}
+
 
 //////////////////////////
 // CODE CHUNK FOR AUDIO //
@@ -314,6 +439,10 @@ void stopMotors() {
 	TPM0_C5V = 0;
 }
 
+//////////////////////
+// CODE FOR THREADS //
+//////////////////////
+
 void tLED(void *argument) {
 	// for the initial connection sequence, set ledFlag to 0x0001
 	int ledCounter = 0;
@@ -371,29 +500,29 @@ void tBrain(void *argument) {
 }
 
 void tAudio(void *argument) {
-	osEventFlagsWait(audioFlag, 0x0001, osFlagsWaitAny, osWaitForever);
+	/*osEventFlagsWait(audioFlag, 0x0001, osFlagsWaitAny, osWaitForever);
 	osEventFlagsClear(audioFlag, 0x0001);
 	for (int i=0; i<12; i++) { // connected tone sequence
 		// mod determines period
-		TPM1->MOD = FREQ_MOD(rickrollStart[i]);
-		TPM1_C0V = (FREQ_MOD(rickrollStart[i])) / 2;
+		TPM0->MOD = FREQ_MOD(rickrollStart[i]);
+		TPM0_C4V = (FREQ_MOD(rickrollStart[i])) / 2;
 		osDelay(100);
-	}
+	}*/
 	
 	for (;;)
 	{
 		for (int i=0; i<15; i++) {
 			// mod determines period
-			TPM1->MOD = FREQ_MOD(rickrollChorus[i]);
+			TPM0->MOD = FREQ_MOD(rickrollChorus[i]);
 			// C0V is the one that determines duty cycle (toggle the thing down)
-			TPM1_C0V = (FREQ_MOD(rickrollChorus[i])) / 2;
+			TPM0_C4V = (FREQ_MOD(rickrollChorus[i])) / 2;
 			osDelay(100);
 		}
 		for (int i=0; i<12; i++) {
 			// mod determines period
-			TPM1->MOD = FREQ_MOD(rickrollStart[i]);
+			TPM0->MOD = FREQ_MOD(rickrollStart[i]);
 			// C0V is the one that determines duty cycle
-			TPM1_C0V = (FREQ_MOD(rickrollStart[i])) / 2;
+			TPM0_C4V = (FREQ_MOD(rickrollStart[i])) / 2;
 			osDelay(100);
 		}
 	}
@@ -482,8 +611,11 @@ int main(void) {
 	//init system components
 	initLed();
 	initUART2(9600);
-	initMotors();
-	initPWMBuzzer();
+	//initMotors();
+	//initPWMBuzzer();
+	initMotor2();
+	//initBuzzer2();
+	initBuzzer2();
 	
 	// initialize flags
 	ledFlag = osEventFlagsNew(NULL);
@@ -496,7 +628,9 @@ int main(void) {
 	osThreadNew(tBrain, NULL, NULL);		
 	osThreadNew(tMotorControl, NULL, NULL);
 	osThreadNew(tLED, NULL, NULL);		
-  osThreadNew(tAudio, NULL, NULL);
+	osThreadNew(tAudio, NULL, NULL);
+  //osThreadId_t audioThread = osThreadNew(tAudio, NULL, NULL);
+	//osThreadSetPriority(audioThread, osPriorityAboveNormal);
   osKernelStart();                       // Start thread execution
 	for (;;) {
 	}

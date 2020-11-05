@@ -339,6 +339,8 @@ void stopMotors() {
 void tLED(void *argument) {
 	// for the initial connection sequence, set ledFlag to 0x0001
 	int ledCounter = 0;
+	int storedCounter = 0;
+	
   osEventFlagsWait(ledFlag, 0x0001, osFlagsWaitAny, osWaitForever);
 	osEventFlagsClear(ledFlag, 0x0001);
 	PTC->PSOR |= GREEN_LED_MASK;
@@ -349,19 +351,21 @@ void tLED(void *argument) {
 	osDelay(250);
 	PTC->PCOR |= GREEN_LED_MASK;
 	for(;;) {
-		//if moving
-		if (direction <= 8 || direction >= 1) {
-			PTC->PTOR |= MASK(PIN_RLED); //toggles green led
+		if (direction != 0x0A) {
+			storedCounter = direction;
+		}
+		if (storedCounter == 9 || storedCounter == 0) {
+			PTC->PTOR |= MASK(PIN_RLED); //toggles red led
+			PTC->PSOR |= GREEN_LED_MASK;
+			osDelay(250);
+		} else {
+				PTC->PTOR |= MASK(PIN_RLED); //toggles green led
 			PTC->PCOR |= GREEN_LED_MASK;
 			PTC->PSOR |= MASK(gLedPos[ledCounter++]);
 			osDelay(500);
 			if (ledCounter >= 9) {
 				ledCounter = 0;
-			}
-		} else { //stationary
-			PTC->PTOR |= MASK(PIN_RLED); //toggles red led
-			PTC->PSOR |= GREEN_LED_MASK;
-			osDelay(250);
+			}			
 		}
 	}
 }
@@ -534,5 +538,3 @@ int main(void) {
 	}*/
 	}
 }
-
-

@@ -13,7 +13,7 @@ int rickrollStart[] ={ 659, 698, 494, 698, 784, 988, 880, 784, 698, 659, 698, 49
 int rickrollChorus[] ={ 233, 261, 277, 293, 349, 349, 311, 207, 233, 261, 207, 311, 311, 277, 233 };
 
 // LEDs
-#define PIN_RLED	5  //portC pin16
+#define PIN_RLED	16  //portC pin16
 
 #define PIN_GLED1	3  //portC pin3
 #define PIN_GLED2	4  //portC pin4
@@ -29,41 +29,28 @@ static int gLedPos[] ={ 3, 4, 5, 6, 10, 11, 12, 13 };
 volatile uint8_t ledCounter = 0;
 
 // Motors
-//	F front B back C clockwise CC counter clockwise
-/*#define PIN_MOTOR_LEFT_FC	 1 //PTC1 : TPM0_CH0
-#define PIN_MOTOR_LEFT_FCC 2 //PTC2 : TPM0_CH1
-#define PIN_MOTOR_LEFT_BC	 29 //PTE29 : TPM0_CH2
-#define PIN_MOTOR_LEFT_BCC 30 //PTE30 : TPM0_CH3
-
-#define PIN_MOTOR_RIGHT_FC	31//PTE31 : TPM0_CH4
-#define PIN_MOTOR_RIGHT_FCC	5//PTD5  :TPM0_CH5
-#define PIN_MOTOR_RIGHT_BC	2//PTB2 : TPM2_CH0
-#define PIN_MOTOR_RIGHT_BCC	3//PTB3 : TPM2_CH1
-*/
-#define PIN_MOTOR_RIGHT_FC	 1 //PTC1 : TPM0_CH0 alt4
-#define PIN_MOTOR_RIGHT_FCC 2 //PTC2 : TPM0_CH1 alt4
-#define PIN_MOTOR_RIGHT_BC	 29 //PTE29 : TPM0_CH2 alt3
-#define PIN_MOTOR_RIGHT_BCC 30 //PTE30 : TPM0_CH3 alt 3
-
-#define PIN_MOTOR_LEFT_FC	31//PTE31 : TPM0_CH4 alt 3
-#define PIN_MOTOR_LEFT_FCC	5//PTD5  :TPM0_CH5 alt4
-#define PIN_MOTOR_LEFT_BC	2//PTB2 : TPM2_CH0 alt 3
-#define PIN_MOTOR_LEFT_BCC	3//PTB3 : TPM2_CH1 alt 3
+//C clockwise CC counter clockwise
+#define PIN_MOTOR_RIGHT_C	 0 //PTD0 : TPM0_CH0 ALT4
+#define PIN_MOTOR_RIGHT_CC 	 5 //PTD5 : TPM0_CH5 ALT4
+#define PIN_MOTOR_LEFT_C	 2 //PTD2 : TPM0_CH2 ALT4
+#define PIN_MOTOR_LEFT_CC	 3 //PTD3 : TPM0_CH3 ALT4
 
 #define MOD_VALUE 10000
 
 // Buzzer
 #define PIN_AUDIO 20 // PTE20 (TPM1_CH0 ALT3)
 #define FREQ_MOD(x) (375000 / x)
+#define TEST_AUDIO 31 // PTE31 tpm0 ch4 alt3
+#define TEST_AUDIO2 0
 
 
-// ??
-#define RED_LED 18   // PortB Pin 18
-#define GREEN_LED 19 // PortB Pin 19
-#define BLUE_LED 1   // PortD Pin 1
-#define SWITCH 6    // PortD Pin 6
+// Legacy code
+//#define RED_LED 18   // PortB Pin 18
+//#define GREEN_LED 19 // PortB Pin 19
+//#define BLUE_LED 1   // PortD Pin 1
+//#define SWITCH 6    // PortD Pin 6
 #define MASK(x) (1 << (x))
-#define PIN_NUM 3 
+//#define PIN_NUM 3 
 
 
 // UART
@@ -72,28 +59,140 @@ volatile uint8_t ledCounter = 0;
 #define UART_RX_PORTE23 23
 #define UART2_INT_PRIO 128
 
-volatile int currentCommand = 0;
-bool isMoving;
+volatile uint8_t rxData = 0;
+volatile uint8_t direction = 0;
 
 osThreadId_t brainFlag;
-osThreadId_t redLedFlag;
-osThreadId_t greenLedFlag;
+osThreadId_t ledFlag;
+osThreadId_t audioStartFlag;
 osThreadId_t audioFlag;
 osThreadId_t motorFlag;
 
-#define Q_SIZE (32)
 
-//Delay function from lecture USE OSdelay() FOR RTOS!!
+// Delay function
 static void delay(volatile uint32_t nof) {
-	while (nof != 0) {
-		__asm("NOP");
-		nof--;
-	}
+  while(nof!=0) {
+    __asm("NOP");
+    nof--;
+  }
 }
 
-enum color_t {	
-RED, GREEN, BLUE
-};
+/////////////////////
+// TEST CODE CHUNK //
+/////////////////////
+
+void initMotor() {
+	SIM_SCGC5 |= SIM_SCGC5_PORTD_MASK;
+	
+	//Use TPM0 CH0
+	PORTD->PCR[PIN_MOTOR_RIGHT_C] &= ~PORT_PCR_MUX_MASK;
+	PORTD->PCR[PIN_MOTOR_RIGHT_C] |= PORT_PCR_MUX(4);
+	//Use TPM0 CH5
+	PORTD->PCR[PIN_MOTOR_RIGHT_CC] &= ~PORT_PCR_MUX_MASK;
+	PORTD->PCR[PIN_MOTOR_RIGHT_CC] |= PORT_PCR_MUX(4);
+	//Use TPM0 CH2
+	PORTD->PCR[PIN_MOTOR_LEFT_C] &= ~PORT_PCR_MUX_MASK;
+	PORTD->PCR[PIN_MOTOR_LEFT_C] |= PORT_PCR_MUX(4);
+	//Use TPM0 CH3
+	PORTD->PCR[PIN_MOTOR_LEFT_CC] &= ~PORT_PCR_MUX_MASK;
+	PORTD->PCR[PIN_MOTOR_LEFT_CC] |= PORT_PCR_MUX(4);
+
+	//Enable clock for tpm0 
+	SIM->SCGC6 |= SIM_SCGC6_TPM0_MASK;
+
+	// this selects the clock source for the TPM counter clock
+	// TPMSRC are bits 24/25
+	SIM->SOPT2 &= ~SIM_SOPT2_TPMSRC_MASK;
+	SIM->SOPT2 |= SIM_SOPT2_TPMSRC(1);
+
+	//cnv 1000 corresponds to 10 percent
+	TPM0->MOD = 10000;
+
+	//Prescalar : divide by 128
+	TPM0->SC &= ~((TPM_SC_CMOD_MASK) | (TPM_SC_PS_MASK));
+	TPM0->SC |= (TPM_SC_CMOD(1) | TPM_SC_PS(7));
+	TPM0->SC &= ~TPM_SC_CPWMS_MASK;
+
+	// Enable PWM on TPM1 Channel 0 -> PTD0
+	TPM0_C0SC &= ~((TPM_CnSC_ELSB_MASK) | (TPM_CnSC_ELSA_MASK) | (TPM_CnSC_MSB_MASK) | (TPM_CnSC_MSA_MASK));
+	TPM0_C0SC |= (TPM_CnSC_ELSB(1) | TPM_CnSC_MSB(1));
+
+	TPM0_C5SC &= ~((TPM_CnSC_ELSB_MASK) | (TPM_CnSC_ELSA_MASK) | (TPM_CnSC_MSB_MASK) | (TPM_CnSC_MSA_MASK));
+	TPM0_C5SC |= (TPM_CnSC_ELSB(1) | TPM_CnSC_MSB(1));
+
+	TPM0_C2SC &= ~((TPM_CnSC_ELSB_MASK) | (TPM_CnSC_ELSA_MASK) | (TPM_CnSC_MSB_MASK) | (TPM_CnSC_MSA_MASK));
+	TPM0_C2SC |= (TPM_CnSC_ELSB(1) | TPM_CnSC_MSB(1));
+
+	TPM0_C3SC &= ~((TPM_CnSC_ELSB_MASK) | (TPM_CnSC_ELSA_MASK) | (TPM_CnSC_MSB_MASK) | (TPM_CnSC_MSA_MASK));
+	TPM0_C3SC |= (TPM_CnSC_ELSB(1) | TPM_CnSC_MSB(1));
+
+	//Initialise all all CNV values to 0. Functions to move will edit this value
+	TPM0_C0V = 0;
+	TPM0_C5V = 0;
+	TPM0_C2V = 0;
+	TPM0_C3V = 0;
+}
+
+void initBuzzer2() {
+	// changed to PTE31 TPM0_CH4 alt 3
+
+	// supplies power to the port
+	SIM->SCGC5 |= SIM_SCGC5_PORTE_MASK;
+
+	// 3 here sets the pin to timer mode page 163
+	PORTE->PCR[TEST_AUDIO] &= ~PORT_PCR_MUX_MASK;
+	PORTE->PCR[TEST_AUDIO] |= PORT_PCR_MUX(3);
+
+	// this bit controls the clock
+	SIM->SCGC6 |= SIM_SCGC6_TPM0_MASK;
+
+	// this selects the clock source for the TPM counter clock
+	// TPMSRC is bits 24/25
+	SIM->SOPT2 &= ~SIM_SOPT2_TPMSRC_MASK;
+	SIM->SOPT2 |= SIM_SOPT2_TPMSRC(1);
+
+	// set modulo value
+	TPM0->MOD = 10000;
+
+	// Edge-Aligned PWM
+	TPM0->SC &= ~((TPM_SC_CMOD_MASK) | (TPM_SC_PS_MASK));
+	TPM0->SC |= (TPM_SC_CMOD(1)) | (TPM_SC_PS(7));
+	TPM0->SC &= ~(TPM_SC_CPWMS_MASK);
+
+	TPM0_C4SC &= ~((TPM_CnSC_ELSB_MASK) | (TPM_CnSC_ELSA_MASK) | (TPM_CnSC_MSB_MASK) | (TPM_CnSC_MSA_MASK));
+	TPM0_C4SC |= (TPM_CnSC_ELSB(1) | TPM_CnSC_MSB(1));
+}
+
+void initBuzzer3() {
+	// changed to PTB0 tpm1 ch0 alt3
+
+	// supplies power to the port
+	SIM->SCGC5 |= SIM_SCGC5_PORTB_MASK;
+
+	// 3 here sets the pin to timer mode page 163
+	PORTB->PCR[TEST_AUDIO2] &= ~PORT_PCR_MUX_MASK;
+	PORTB->PCR[TEST_AUDIO2] |= PORT_PCR_MUX(3);
+
+	// this bit controls the clock
+	SIM->SCGC6 |= SIM_SCGC6_TPM1_MASK;
+
+	// this selects the clock source for the TPM counter clock
+	// TPMSRC is bits 24/25
+	SIM->SOPT2 &= ~SIM_SOPT2_TPMSRC_MASK;
+	SIM->SOPT2 |= SIM_SOPT2_TPMSRC(1);
+
+	// set modulo value
+	TPM1->MOD = 10000;
+
+	// Edge-Aligned PWM
+	TPM1->SC &= ~((TPM_SC_CMOD_MASK) | (TPM_SC_PS_MASK));
+	TPM1->SC |= (TPM_SC_CMOD(1)) | (TPM_SC_PS(7));
+	TPM1->SC &= ~(TPM_SC_CPWMS_MASK);
+
+	TPM1_C0SC &= ~((TPM_CnSC_ELSB_MASK) | (TPM_CnSC_ELSA_MASK) | (TPM_CnSC_MSB_MASK) | (TPM_CnSC_MSA_MASK));
+	TPM1_C0SC |= (TPM_CnSC_ELSB(1) | TPM_CnSC_MSB(1));
+}
+
 
 //////////////////////////
 // CODE CHUNK FOR AUDIO //
@@ -165,28 +264,18 @@ void initUART2(uint32_t baudrate)
 	NVIC_SetPriority(UART2_IRQn, 128);
 	NVIC_ClearPendingIRQ(UART2_IRQn);
 	NVIC_EnableIRQ(UART2_IRQn);
-	UART2->C2 |= UART_C2_TIE_MASK |
-							 UART_C2_RIE_MASK;
 	UART2->C2 |= UART_C2_RIE_MASK;
 }
 
 void UART2_IRQHandler() {
 	NVIC_ClearPendingIRQ(UART2_IRQn);
 	// for transmit
-	if (UART2->S1 & UART_S1_TDRE_MASK) {
-	}
-	// for receiver
-	if (UART2->S1 & UART_S1_RDRF_MASK) {
-		// assigns integer to current command
-		currentCommand =  (uint8_t)UART2->D;
-		osThreadFlagsSet(brainFlag, 0x0001);
-	}
-	if (UART2->S1 & (UART_S1_OR_MASK |
-		UART_S1_NF_MASK |
-		UART_S1_FE_MASK |
-		UART_S1_PF_MASK)) {
-		// TO IMPLEMENT error handling
-		// clear the flag
+	if(UART2->S1 & UART_S1_TDRE_MASK) {
+	}	
+	if(UART2->S1 & UART_S1_RDRF_MASK) {
+		rxData = UART2->D;
+		// prompts tBrain to change variables
+		osEventFlagsSet(brainFlag, 0x0001);
 	}
 }
 
@@ -214,380 +303,168 @@ void initLed(void)
 	PTC->PDDR |= MASK(PIN_RLED);
 }
 
-void initMotors() {
-	SIM_SCGC5 |= SIM_SCGC5_PORTB_MASK;
-	SIM_SCGC5 |= SIM_SCGC5_PORTD_MASK;
-
-	//Use TPM0 CH0
-	PORTC->PCR[PIN_MOTOR_RIGHT_FC] &= ~PORT_PCR_MUX_MASK;
-	PORTC->PCR[PIN_MOTOR_RIGHT_FC] |= PORT_PCR_MUX(4);
-	//Use TPM0 CH1
-	PORTC->PCR[PIN_MOTOR_RIGHT_FCC] &= ~PORT_PCR_MUX_MASK;
-	PORTC->PCR[PIN_MOTOR_RIGHT_FCC] |= PORT_PCR_MUX(4);
-	//Use TPM0 CH2
-	PORTE->PCR[PIN_MOTOR_RIGHT_BC] &= ~PORT_PCR_MUX_MASK;
-	PORTE->PCR[PIN_MOTOR_RIGHT_BC] |= PORT_PCR_MUX(3);
-	//Use TPM0 CH3
-	PORTE->PCR[PIN_MOTOR_RIGHT_BCC] &= ~PORT_PCR_MUX_MASK;
-	PORTE->PCR[PIN_MOTOR_RIGHT_BCC] |= PORT_PCR_MUX(3);
-	//Use TPM0 CH4
-	PORTE->PCR[PIN_MOTOR_LEFT_FC] &= ~PORT_PCR_MUX_MASK;
-	PORTE->PCR[PIN_MOTOR_LEFT_FC] |= PORT_PCR_MUX(3);
-	//Use TMP0 CH5
-	PORTD->PCR[PIN_MOTOR_LEFT_FCC] &= ~PORT_PCR_MUX_MASK;
-	PORTD->PCR[PIN_MOTOR_LEFT_FCC] |= PORT_PCR_MUX(4);
-	//Use TMP2 CH0
-	PORTB->PCR[PIN_MOTOR_LEFT_BC] &= ~PORT_PCR_MUX_MASK;
-	PORTB->PCR[PIN_MOTOR_LEFT_BC] |= PORT_PCR_MUX(3);
-	//Use TPM2 CH1
-	PORTB->PCR[PIN_MOTOR_LEFT_BCC] &= ~PORT_PCR_MUX_MASK;
-	PORTB->PCR[PIN_MOTOR_LEFT_BCC] |= PORT_PCR_MUX(3);
-
-	//Enable clock for tpm0 and tpm 2
-	SIM->SCGC6 |= SIM_SCGC6_TPM2_MASK;
-	SIM->SCGC6 |= SIM_SCGC6_TPM0_MASK;
-
-	// this selects the clock source for the TPM counter clock
-	// TPMSRC are bits 24/25
-	SIM->SOPT2 &= ~SIM_SOPT2_TPMSRC_MASK;
-	SIM->SOPT2 |= SIM_SOPT2_TPMSRC(1);
-
-	//cnv 1000 corresponds to 10 percent
-	TPM0->MOD = 10000;
-	TPM2->MOD = 10000;
-
-	//Prescalar : divide by 128
-	TPM0->SC &= ~((TPM_SC_CMOD_MASK) | (TPM_SC_PS_MASK));
-	TPM0->SC |= (TPM_SC_CMOD(1) | TPM_SC_PS(7));
-	TPM0->SC &= ~TPM_SC_CPWMS_MASK;
-
-	TPM2->SC &= ~((TPM_SC_CMOD_MASK) | (TPM_SC_PS_MASK));
-	TPM2->SC |= (TPM_SC_CMOD(1) | TPM_SC_PS(7));
-	TPM2->SC &= ~TPM_SC_CPWMS_MASK;
-
-
-	// Enable PWM on TPM1 Channel 0 -> PTB0
-	TPM0_C0SC &= ~((TPM_CnSC_ELSB_MASK) | (TPM_CnSC_ELSA_MASK) | (TPM_CnSC_MSB_MASK) | (TPM_CnSC_MSA_MASK));
-	TPM0_C0SC |= (TPM_CnSC_ELSB(1) | TPM_CnSC_MSB(1));
-
-	TPM0_C1SC &= ~((TPM_CnSC_ELSB_MASK) | (TPM_CnSC_ELSA_MASK) | (TPM_CnSC_MSB_MASK) | (TPM_CnSC_MSA_MASK));
-	TPM0_C1SC |= (TPM_CnSC_ELSB(1) | TPM_CnSC_MSB(1));
-
-	TPM0_C2SC &= ~((TPM_CnSC_ELSB_MASK) | (TPM_CnSC_ELSA_MASK) | (TPM_CnSC_MSB_MASK) | (TPM_CnSC_MSA_MASK));
-	TPM0_C2SC |= (TPM_CnSC_ELSB(1) | TPM_CnSC_MSB(1));
-
-	TPM0_C3SC &= ~((TPM_CnSC_ELSB_MASK) | (TPM_CnSC_ELSA_MASK) | (TPM_CnSC_MSB_MASK) | (TPM_CnSC_MSA_MASK));
-	TPM0_C3SC |= (TPM_CnSC_ELSB(1) | TPM_CnSC_MSB(1));
-
-	TPM0_C4SC &= ~((TPM_CnSC_ELSB_MASK) | (TPM_CnSC_ELSA_MASK) | (TPM_CnSC_MSB_MASK) | (TPM_CnSC_MSA_MASK));
-	TPM0_C4SC |= (TPM_CnSC_ELSB(1) | TPM_CnSC_MSB(1));
-
-	TPM0_C5SC &= ~((TPM_CnSC_ELSB_MASK) | (TPM_CnSC_ELSA_MASK) | (TPM_CnSC_MSB_MASK) | (TPM_CnSC_MSA_MASK));
-	TPM0_C5SC |= (TPM_CnSC_ELSB(1) | TPM_CnSC_MSB(1));
-
-	TPM2_C0SC &= ~((TPM_CnSC_ELSB_MASK) | (TPM_CnSC_ELSA_MASK) | (TPM_CnSC_MSB_MASK) | (TPM_CnSC_MSA_MASK));
-	TPM2_C0SC |= (TPM_CnSC_ELSB(1) | TPM_CnSC_MSB(1));
-
-	TPM2_C1SC &= ~((TPM_CnSC_ELSB_MASK) | (TPM_CnSC_ELSA_MASK) | (TPM_CnSC_MSB_MASK) | (TPM_CnSC_MSA_MASK));
-	TPM2_C1SC |= (TPM_CnSC_ELSB(1) | TPM_CnSC_MSB(1));
-
-	//Initialise all all CNV values to 0. Functions to move will edit this value
-	TPM2_C0V = 0;
-	TPM2_C1V = 0;
-	TPM0_C0V = 0;
-	TPM0_C1V = 0;
-	TPM0_C2V = 0;
-	TPM0_C3V = 0;
-	TPM0_C4V = 0;
-	TPM0_C5V = 0;
-}
 int calcCnv(int dutyCycle) {
 	return ((dutyCycle / 100) * 10000);
 }
 
-void moveRightFrontCounterClockwise(int cnvValue) {
+void moveRightCounterClockwise(int cnvValue) {
 	TPM0_C0V = cnvValue;
 }
 
-void moveRightFrontClockwise(int cnvValue) {
-	TPM0_C1V = cnvValue;
-}
-
-void moveRightBackCounterClockwise(int cnvValue) {
-	TPM0_C2V = cnvValue;
-}
-
-void moveRightBackClockwise(int cnvValue) {
-	TPM0_C3V = cnvValue;
-}
-
-void moveLeftFrontClockwise(int cnvValue) {
-	TPM0_C4V = cnvValue;
-}
-
-void moveLeftFrontCounterClockwise(int cnvValue) {
+void moveRightClockwise(int cnvValue) {
 	TPM0_C5V = cnvValue;
 }
 
-void moveLeftBackClockwise(int cnvValue) {
-	TPM2_C0V = cnvValue;
+void moveLeftCounterClockwise(int cnvValue) {
+	TPM0_C2V = cnvValue;
 }
 
-void moveLeftBackCounterClockwise(int cnvValue) {
-	TPM2_C1V = cnvValue;
+void moveLeftClockwise(int cnvValue) {
+	TPM0_C3V = cnvValue;
 }
+
 
 void stopMotors() {
-	TPM2_C0V = 0;
-	TPM2_C1V = 0;
+
 	TPM0_C0V = 0;
-	TPM0_C1V = 0;
+	TPM0_C5V = 0;
 	TPM0_C2V = 0;
 	TPM0_C3V = 0;
-	TPM0_C4V = 0;
-	TPM0_C5V = 0;
 }
 
-//Flash red LED on and off 500ms or 250ms as determined
-void tLEDRED(int delayTime) {
-	while (1) {
-		PTC->PSOR |= MASK(PIN_RLED);
-		osDelay(delayTime);
-		PTC->PCOR |= MASK(delayTime);
-		osDelay(delayTime);
-	}
-}
+//////////////////////
+// CODE FOR THREADS //
+//////////////////////
 
-//Flash green LED on and off 500ms or 250ms as determined
-void flashGreen(int delayTime) {
-	while (1) {
-		PTC->PSOR |= GREEN_LED_MASK;
-		osDelay(delayTime);
-		// doesnt need to turn off when it's stationary
-		//PTC->PCOR |= GREEN_LED_MASK;
-		osDelay(delayTime);
-	}
-}
-
-//Flash green 1 by 1
-void alternatingGreen(int delayTime) {
-	while (1) {
-		PTC->PCOR |= GREEN_LED_MASK;
-		PTC->PSOR |= gLedPos[ledCounter++];
-		osDelay(delayTime);
-		if (ledCounter >=7) {
-			ledCounter =0;
+void tLED(void *argument) {
+	// for the initial connection sequence, set ledFlag to 0x0001
+	int ledCounter = 0;
+  osEventFlagsWait(ledFlag, 0x0001, osFlagsWaitAny, osWaitForever);
+	osEventFlagsClear(ledFlag, 0x0001);
+	PTC->PSOR |= GREEN_LED_MASK;
+	osDelay(250);
+	PTC->PCOR |= GREEN_LED_MASK;
+	osDelay(500);
+	PTC->PSOR |= GREEN_LED_MASK;
+	osDelay(250);
+	PTC->PCOR |= GREEN_LED_MASK;
+	for(;;) {
+		//if moving
+		if (direction <= 8 || direction >= 1) {
+			PTC->PTOR |= MASK(PIN_RLED); //toggles green led
+			PTC->PCOR |= GREEN_LED_MASK;
+			PTC->PSOR |= MASK(gLedPos[ledCounter++]);
+			osDelay(500);
+			if (ledCounter >= 9) {
+				ledCounter = 0;
+			}
+		} else { //stationary
+			PTC->PTOR |= MASK(PIN_RLED); //toggles red led
+			PTC->PSOR |= GREEN_LED_MASK;
+			osDelay(250);
 		}
 	}
 }
 
-
 void tBrain(void *argument) {
-	uint8_t hold; //variable to hold the value
+	//decodes messages received from serial comms
 	uint8_t status; //current state of machine
 	for (;;)
 	{
-		osThreadFlagsWait(0x0001, osFlagsWaitAll, osWaitForever);
-		// to check if command changed
-		if (currentCommand != hold || currentCommand != 0) 
-		{
-			hold = currentCommand;
-		}
-		// code chunk here to control the LED and buzzer
-		if (hold >= 10 && hold <= 12) {
-			status = hold;
-		}
-		switch(status) {
-			case 10:
-				//run connect routine
-				osThreadFlagsSet(greenLedFlag, 0x0001);
-			  osThreadFlagsSet(redLedFlag, 0x0001);
-				osThreadFlagsSet(audioFlag, 0x0001);
-			  //ensure that connection routine runs to completion before continuing
-				osThreadFlagsWait(0x0010, osFlagsWaitAll, osWaitForever);
-				status += 1; //automatically updates status to go to run state
-			case 11:
-				//run normal routine
-				osThreadFlagsSet(greenLedFlag, 0x0010);
-			  osThreadFlagsSet(redLedFlag, 0x0010);
-				osThreadFlagsSet(audioFlag, 0x0010);
-			case 12:
-				//sent only when end challenge command button is pressed
-				osThreadFlagsSet(greenLedFlag, 0x0100);
-			  osThreadFlagsSet(redLedFlag, 0x0100);
-				osThreadFlagsSet(audioFlag, 0x0100);
+		osEventFlagsWait(brainFlag, 0x0001, osFlagsWaitAny, osWaitForever);
+		osEventFlagsClear(brainFlag, 0x0001);
+		
+		if (rxData == 10) {
+			osEventFlagsSet(audioFlag, 0x0001);
+			osEventFlagsSet(ledFlag, 0x0001);
 		}
 		//to check if is moving
-		if (hold >= 1 || hold <= 8) 
+		if (rxData >= 1 || rxData <= 9) 
 		{
-			isMoving = true;
-			if (hold == 1) { //forward
-				osThreadFlagsSet(motorFlag, 0x0001);
-			} else if (hold == 2) { //backward
-				osThreadFlagsSet(motorFlag, 0x0010);
-			} else if (hold == 3) { //left
-				osThreadFlagsSet(motorFlag, 0x0100);
-			} else if (hold == 4) { //right
-				osThreadFlagsSet(motorFlag, 0x1000);
-			} else if (hold == 5) { //forward left
-				osThreadFlagsSet(motorFlag, 0x0101);
-			} else if (hold == 6) { //forward right
-				osThreadFlagsSet(motorFlag, 0x1001);
-			} else if (hold == 7) { //backward left
-				osThreadFlagsSet(motorFlag, 0x0110);
-			} else if (hold == 8) { //backward right
-				osThreadFlagsSet(motorFlag, 0x1010);
+			if (rxData >= 1 || rxData <= 8) { //moving
+				direction = rxData;
+			} else { // not moving
+				direction = 9;
 			}
-		} else {
-			isMoving = false;
-		}
-		
-	}
-}
-
-void tLEDGreen(void *argument) {
-	for (;;)
-	{
-		if (osThreadFlagsGet() == 0x0010) { // normal operation sequence
-			osThreadFlagsWait(0x0010, osFlagsWaitAll, osWaitForever);
-			if (isMoving == false) {
-				// turns on all LEDs
-				PTC->PSOR |= GREEN_LED_MASK;
-			}
-			else if (isMoving == true) {
-				PTC->PCOR |= GREEN_LED_MASK;
-				PTC->PSOR |= gLedPos[ledCounter++];
-				osDelay(300);
-				if (ledCounter >=7) {
-					ledCounter =0;
-				}
-			}
-		} else if (osThreadFlagsGet() == 0x0001) { // just connected sequence
-			PTC->PSOR |= GREEN_LED_MASK;
-			osDelay(250);
-			PTC->PCOR |= GREEN_LED_MASK;
-			osDelay(500);
-			PTC->PSOR |= GREEN_LED_MASK;
-			osDelay(250);
-			PTC->PCOR |= GREEN_LED_MASK;
-			osThreadFlagsSet(brainFlag, 0x0010);
-		}
-		
-	}
-}
-
-void tLEDRed(void *argument) {
-	for (;;)
-	{
-		if (isMoving == false) {
-		PTC->PSOR |= MASK(PIN_RLED);
-		osDelay(250);
-		PTC->PCOR |= MASK(PIN_RLED);
-		osDelay(250);
-		}
-		else if (isMoving == true) {
-		PTC->PSOR |= MASK(PIN_RLED);
-		osDelay(500);
-		PTC->PCOR |= MASK(PIN_RLED);
-		osDelay(500);
+			//set flag to prompt motor update
+			osEventFlagsSet(motorFlag, 0x0001);
 		}
 	}
 }
 
 void tAudio(void *argument) {
+	osEventFlagsWait(audioFlag, 0x0001, osFlagsWaitAny, osWaitForever);
+	osEventFlagsClear(audioFlag, 0x0001);
+	for (int i=0; i<12; i++) { // connected tone sequence
+		// mod determines period
+		TPM0->MOD = FREQ_MOD(rickrollStart[i]);
+		TPM0_C4V = (FREQ_MOD(rickrollStart[i])) / 2;
+		osDelay(100);
+	}
+	
 	for (;;)
 	{
-			if (osThreadFlagsGet() == 0x0001) { //JUST CONNECTED SEQUENCE
-				osThreadFlagsWait(0x0001, osFlagsWaitAll, osWaitForever);
-				for (int i=0; i<12; i++) {
-					// mod determines period
-					TPM1->MOD = FREQ_MOD(rickrollStart[i]);
-					// C0V is the one that determines duty cycle (toggle the thing down)
-					// so this being half, halves the duty cycle
-					TPM1_C0V = (FREQ_MOD(rickrollStart[i])) / 2;
-					osDelay(100);
-				}
-			}
-			else if (osThreadFlagsGet() == 0x0010) { //NORMAL OP SEQUENCE
-				osThreadFlagsWait(0x0010, osFlagsWaitAll, osWaitForever);
-				for (int i=0; i<15; i++) {
-					// mod determines period
-					TPM1->MOD = FREQ_MOD(rickrollChorus[i]);
-					// C0V is the one that determines duty cycle (toggle the thing down)
-					TPM1_C0V = (FREQ_MOD(rickrollChorus[i])) / 2;
-					osDelay(100);
-				}
-			}
-			else if (osThreadFlagsGet() == 0x0100) { //END SEQUENCE
-				osThreadFlagsWait(0x0100, osFlagsWaitAll, osWaitForever);
-				for (int i=0; i<12; i++) {
-					// mod determines period
-					TPM1->MOD = FREQ_MOD(rickrollStart[i]);
-					// C0V is the one that determines duty cycle
-					TPM1_C0V = (FREQ_MOD(rickrollStart[i])) / 2;
-					osDelay(100);
-				}
-			}
+		for (int i=0; i<15; i++) {
+			// mod determines period
+			TPM0->MOD = FREQ_MOD(rickrollChorus[i]);
+			// C0V is the one that determines duty cycle (toggle the thing down)
+			TPM0_C4V = (FREQ_MOD(rickrollChorus[i])) / 2;
+			osDelay(200);
+		}
+		for (int i=0; i<12; i++) {
+			// mod determines period
+			TPM0->MOD = FREQ_MOD(rickrollStart[i]);
+			// C0V is the one that determines duty cycle
+			TPM0_C4V = (FREQ_MOD(rickrollStart[i])) / 2;
+			osDelay(200);
+		}
 	}
 }
 
 
 void tMotorControl() {
 	for (;;)
-	{
-		if (isMoving == false) {
-			stopMotors();
-		}
-		else if (isMoving == true) {
-			if (osThreadFlagsGet() == 0x0001){ //forward
-				moveRightFrontClockwise(100);
-				moveRightBackClockwise(100);
-				moveLeftFrontCounterClockwise(100);
-				moveLeftBackCounterClockwise(100);
+	{		
+		// only updates when direction is updated by tBrain
+		osEventFlagsWait(motorFlag, 0x0001, osFlagsWaitAny, osWaitForever);
+		osEventFlagsClear(motorFlag, 0x0001);
+		if (direction != 0) {
+			if (direction == 1){ //forward
+				moveRightClockwise(1000);
+				moveLeftClockwise(1000);
 				
-			} else if (osThreadFlagsGet() == 0x0010){ //backward
-				moveRightFrontCounterClockwise(100);
-				moveRightBackCounterClockwise(100);
-				moveLeftFrontClockwise(100);
-				moveLeftBackClockwise(100);
+			} else if (direction == 2){ //backward
+				moveRightCounterClockwise(1000);
+				moveLeftCounterClockwise(1000);
 				
-			} else if (osThreadFlagsGet() == 0x0100){ //turn left
-				moveRightFrontClockwise(100);
-				moveRightBackClockwise(100);
-				moveLeftFrontClockwise(100);
-				moveLeftBackClockwise(100);
+			} else if (direction == 3){ //turn left
+				moveRightCounterClockwise(1000);
+				moveLeftClockwise(1000);
 				
-			} else if (osThreadFlagsGet() == 0x1000){ //turn right
-				moveRightFrontCounterClockwise(100);
-				moveRightBackCounterClockwise(100);
-				moveLeftFrontClockwise(100);
-				moveLeftBackClockwise(100);
+			} else if (direction == 4){ //turn right
+				moveRightClockwise(1000);
+				moveLeftCounterClockwise(1000);
 				
-			} else if (osThreadFlagsGet() == 0x0101){ //forward left
-				moveRightFrontClockwise(100);
-				moveRightBackClockwise(100);
-				moveLeftFrontCounterClockwise(50);
-				moveLeftBackCounterClockwise(50);
+			} else if (direction == 5){ //forward left
+				moveRightClockwise(1000);
+				moveLeftClockwise(2000);
 				
-			} else if (osThreadFlagsGet() == 0x1001){ //forward right
-				moveRightFrontClockwise(50);
-				moveRightBackClockwise(50);
-				moveLeftFrontCounterClockwise(100);
-				moveLeftBackCounterClockwise(100);
+			} else if (direction == 6){ //forward right
+				moveRightClockwise(2000);
+				moveLeftClockwise(1000);
 				
-			} else if (osThreadFlagsGet() == 0x0110){ //reverse left
-				moveRightFrontCounterClockwise(100);
-				moveRightBackCounterClockwise(100);
-				moveLeftFrontClockwise(50);
-				moveLeftBackClockwise(50);
+			} else if (direction == 7){ //reverse left
+				moveRightCounterClockwise(2000);
+				moveLeftCounterClockwise(1000);
 				
-			} else if (osThreadFlagsGet() == 0x1010){ //reverse right
-				moveRightFrontCounterClockwise(50);
-				moveRightBackCounterClockwise(50);
-				moveLeftFrontClockwise(100);
-				moveLeftBackClockwise(100);
+			} else if (direction == 8){ //reverse right
+				moveRightCounterClockwise(1000);
+				moveLeftCounterClockwise(2000);
 				
 			}
+		}
+		else {
+			stopMotors();
 		}
 	}
 }
@@ -608,34 +485,54 @@ int main(void) {
 	// System Initialization
 	SystemCoreClockUpdate();
 	
-	//init everything
+	//init system components
 	initLed();
 	initUART2(9600);
-	initMotors();
-	initPWMBuzzer();
+	initMotor();
+	initBuzzer2();
+	
+	// initialize flags
+	ledFlag = osEventFlagsNew(NULL);
+	brainFlag = osEventFlagsNew(NULL);
+	audioFlag = osEventFlagsNew(NULL);
+	motorFlag = osEventFlagsNew(NULL);
 	
 	// put everything into threads
-	osKernelInitialize();                 // Initialize CMSIS-RTOS
-	osThreadNew(tBrain, NULL, NULL);			// self explanatory
+	osKernelInitialize();                  // Initialize CMSIS-RTOS
+	osThreadNew(tBrain, NULL, NULL);		
 	osThreadNew(tMotorControl, NULL, NULL);
-	osThreadNew(tLEDGreen, NULL, NULL);			// self explanatory
-	osThreadNew(tLEDRed, NULL, NULL);			// self explanatory
-  osThreadNew(tAudio, NULL, NULL);    // Create application main thread
-  osKernelStart();
-// Start thread execution
+	osThreadNew(tLED, NULL, NULL);		
+	osThreadNew(tAudio, NULL, NULL);
+  //osThreadId_t audioThread = osThreadNew(tAudio, NULL, NULL);
+	//osThreadSetPriority(audioThread, osPriorityAboveNormal);
+  osKernelStart();                       // Start thread execution
 	for (;;) {
 	}
+	//int ledCounter = 0;
 	while (1) {
-		//moveLeftFrontClockwise(2500);
-		//moveLeftFrontCounterClockwise(2500);
-		//moveLeftBackClockwise(2500);
-		//moveLeftBackCounterClockwise(2500);
-		//moveRightFrontClockwise(2500);
-		//moveRightFrontCounterClockwise(2500);
-		//moveRightBackClockwise(2500);
+		//moveLeftClockwise(2500);
+		//moveLeftCounterClockwise(2500);
+		//moveRightClockwise(2500);
+		//moveRightCounterClockwise(2500);
 		//stopMotors();
+		/*PTC->PCOR |= GREEN_LED_MASK;
+		delay(1000000);
+		PTC->PSOR |= MASK(gLedPos[2]);
+		delay(1000000);
+		PTC->PSOR |= MASK(gLedPos[3]);
+		delay(1000000);
+		PTC->PSOR |= MASK(gLedPos[4]);
+		delay(1000000);
+		PTC->PSOR |= MASK(gLedPos[5]);
+		delay(1000000);
+		ledCounter = ledCounter + 1;
+			PTC->PSOR |= MASK(PIN_RLED); //toggles red led
+		
+			
+			if (ledCounter >= 9) {
+				ledCounter = 0;
+	}*/
 	}
-	
 }
 
 

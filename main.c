@@ -396,9 +396,11 @@ void tBrain(void *argument) {
 	}
 }
 
+uint32_t flag;
 void tAudio(void *argument) {
 	osEventFlagsWait(audioFlag, 0x0001, osFlagsWaitAny, osWaitForever);
 	osEventFlagsClear(audioFlag, 0x0001);
+	flag = osEventFlagsGet(audioFlag);
 	for (int i=0; i<12; i++) { // connected tone sequence
 		// mod determines period
 		TPM0->MOD = FREQ_MOD(rickrollStart[i]);
@@ -425,8 +427,7 @@ void tAudio(void *argument) {
 	}
 }
 
-
-void tMotorControl() {
+void tMotorControl(void *argument) {
 	for (;;)
 	{		
 		// only updates when direction is updated by tBrain
@@ -506,9 +507,9 @@ int main(void) {
 	osThreadNew(tBrain, NULL, NULL);		
 	osThreadNew(tMotorControl, NULL, NULL);
 	osThreadNew(tLED, NULL, NULL);		
-	osThreadNew(tAudio, NULL, NULL);
-  //osThreadId_t audioThread = osThreadNew(tAudio, NULL, NULL);
-	//osThreadSetPriority(audioThread, osPriorityAboveNormal);
+	//osThreadNew(tAudio, NULL, NULL);
+  osThreadId_t audioThread = osThreadNew(tAudio, NULL, NULL);
+	osThreadSetPriority(audioThread, osPriorityAboveNormal);
   osKernelStart();                       // Start thread execution
 	for (;;) {
 	}
